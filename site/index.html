@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Shield — AI Agent Audit Scanner</title>
+<meta name="description" content="Discover, score, and audit every AI agent in your codebase. The npm audit for AI agents.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+--bg:#0A0A0F;--surface:#13131A;--surface-2:#1A1A25;--border:#252530;
+--green:#00FF88;--green-dim:#00CC6E;--amber:#FFB800;--red:#FF3366;--blue:#4488FF;
+--text:#E8E8ED;--muted:#8888A0;--faint:#44445A;
+--mono:'JetBrains Mono',monospace;--sans:'DM Sans',sans-serif;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:var(--green);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* Scanline overlay */
+body::before{
+content:'';position:fixed;top:0;left:0;width:100%;height:100%;
+background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,136,0.008) 2px,rgba(0,255,136,0.008) 4px);
+pointer-events:none;z-index:9999;
+}
+
+/* NAV */
+nav{position:fixed;top:0;width:100%;z-index:100;backdrop-filter:blur(16px);background:rgba(10,10,15,0.85);border-bottom:1px solid var(--border)}
+.nav-inner{max-width:1200px;margin:0 auto;padding:16px 32px;display:flex;justify-content:space-between;align-items:center}
+.logo{font-family:var(--mono);font-weight:700;font-size:18px;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px}
+.logo-icon{width:20px;height:20px;border:2px solid var(--green);transform:rotate(45deg);display:flex;align-items:center;justify-content:center}
+.logo-icon::after{content:'';width:8px;height:8px;background:var(--green);transform:rotate(-45deg)}
+.nav-links{display:flex;gap:32px;align-items:center}
+.nav-links a{color:var(--muted);font-size:14px;font-weight:500;transition:color 0.2s}
+.nav-links a:hover{color:var(--text);text-decoration:none}
+.nav-cta{background:var(--green);color:var(--bg);padding:8px 20px;font-weight:600;font-size:13px;font-family:var(--mono);letter-spacing:0.5px;border:none;cursor:pointer;transition:all 0.15s}
+.nav-cta:hover{background:#00FFAA;text-decoration:none;color:var(--bg)}
+
+/* HERO */
+.hero{padding:160px 32px 80px;max-width:1200px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center}
+.hero-badge{font-family:var(--mono);font-size:12px;color:var(--green);border:1px solid rgba(0,255,136,0.3);padding:6px 14px;display:inline-block;margin-bottom:24px;letter-spacing:1px}
+.hero h1{font-size:52px;font-weight:700;line-height:1.1;letter-spacing:-2px;margin-bottom:20px}
+.hero h1 .accent{color:var(--green)}
+.hero p{font-size:18px;color:var(--muted);line-height:1.7;margin-bottom:36px;max-width:480px}
+.hero-actions{display:flex;gap:16px;align-items:center}
+.btn-primary{background:var(--green);color:var(--bg);padding:14px 28px;font-weight:700;font-size:15px;font-family:var(--sans);border:none;cursor:pointer;transition:all 0.15s;display:inline-flex;align-items:center;gap:8px}
+.btn-primary:hover{background:#00FFAA;text-decoration:none;color:var(--bg);transform:translateY(-1px)}
+.btn-secondary{border:1px solid var(--border);color:var(--text);padding:14px 28px;font-weight:600;font-size:15px;font-family:var(--sans);cursor:pointer;background:transparent;transition:all 0.15s;display:inline-flex;align-items:center;gap:8px}
+.btn-secondary:hover{border-color:var(--muted);text-decoration:none;transform:translateY(-1px)}
+
+/* TERMINAL */
+.terminal{background:var(--surface);border:1px solid var(--border);overflow:hidden;font-family:var(--mono);font-size:12px;line-height:1.7;position:relative}
+.terminal-bar{padding:10px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.terminal-dot{width:10px;height:10px;border:1px solid var(--faint)}
+.terminal-dot.r{border-color:#FF3366}.terminal-dot.y{border-color:#FFB800}.terminal-dot.g{border-color:#00FF88}
+.terminal-title{color:var(--muted);font-size:11px;margin-left:auto}
+.terminal-body{padding:20px;overflow-x:auto;max-height:420px;overflow-y:auto}
+.terminal-body .g{color:var(--green)}.terminal-body .r{color:var(--red)}.terminal-body .y{color:var(--amber)}.terminal-body .b{color:var(--blue)}.terminal-body .m{color:var(--muted)}.terminal-body .w{color:var(--text);font-weight:600}
+.terminal-body .dim{opacity:0.5}
+.cursor-blink{animation:blink 1s infinite}
+@keyframes blink{0%,50%{opacity:1}51%,100%{opacity:0}}
+
+/* INSTALL BAR */
+.install-bar{max-width:1200px;margin:-20px auto 80px;padding:0 32px}
+.install-box{background:var(--surface);border:1px solid var(--border);padding:20px 28px;display:flex;align-items:center;justify-content:space-between;font-family:var(--mono);font-size:14px}
+.install-box code{color:var(--green)}
+.install-box .copy-hint{color:var(--muted);font-size:12px}
+
+/* METRICS */
+.metrics{max-width:1200px;margin:0 auto 100px;padding:0 32px;display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border)}
+.metric{background:var(--bg);padding:40px 32px;text-align:center}
+.metric-value{font-family:var(--mono);font-size:36px;font-weight:700;color:var(--green);margin-bottom:8px}
+.metric-label{font-size:13px;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
+
+/* FEATURES */
+.features{max-width:1200px;margin:0 auto;padding:0 32px 120px}
+.section-label{font-family:var(--mono);font-size:12px;color:var(--green);letter-spacing:2px;text-transform:uppercase;margin-bottom:16px}
+.section-title{font-size:36px;font-weight:700;letter-spacing:-1px;margin-bottom:12px}
+.section-subtitle{color:var(--muted);font-size:16px;margin-bottom:60px;max-width:560px}
+.feature-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border)}
+.feature-card{background:var(--bg);padding:40px 32px;transition:background 0.2s}
+.feature-card:hover{background:var(--surface)}
+.feature-icon{width:40px;height:40px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;margin-bottom:20px;font-size:18px}
+.feature-card h3{font-size:16px;font-weight:600;margin-bottom:10px}
+.feature-card p{font-size:14px;color:var(--muted);line-height:1.6}
+
+/* FRAMEWORKS */
+.frameworks{max-width:1200px;margin:0 auto;padding:0 32px 120px}
+.framework-grid{display:flex;flex-wrap:wrap;gap:12px;margin-top:40px}
+.framework-tag{border:1px solid var(--border);padding:10px 20px;font-family:var(--mono);font-size:13px;color:var(--muted);transition:all 0.2s;display:flex;align-items:center;gap:8px}
+.framework-tag:hover{border-color:var(--green);color:var(--green)}
+.framework-tag .risk{font-size:11px;padding:2px 6px;border:1px solid}
+.framework-tag .risk.low{color:var(--green);border-color:var(--green)}.framework-tag .risk.med{color:var(--amber);border-color:var(--amber)}.framework-tag .risk.high{color:var(--red);border-color:var(--red)}
+
+/* COMPLIANCE */
+.compliance{max-width:1200px;margin:0 auto;padding:0 32px 120px}
+.compliance-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);margin-top:40px}
+.compliance-card{background:var(--bg);padding:32px 24px;text-align:center;transition:background 0.2s}
+.compliance-card:hover{background:var(--surface)}
+.compliance-card .badge{font-family:var(--mono);font-size:11px;color:var(--green);border:1px solid var(--green);padding:4px 10px;display:inline-block;margin-bottom:16px}
+.compliance-card h4{font-size:15px;font-weight:600;margin-bottom:8px}
+.compliance-card p{font-size:13px;color:var(--muted)}
+
+/* CTA */
+.cta-section{max-width:1200px;margin:0 auto;padding:0 32px 120px}
+.cta-box{border:1px solid var(--green);padding:80px 60px;text-align:center;position:relative;overflow:hidden}
+.cta-box::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;background:linear-gradient(135deg,rgba(0,255,136,0.03),transparent);pointer-events:none}
+.cta-box h2{font-size:32px;font-weight:700;letter-spacing:-1px;margin-bottom:16px}
+.cta-box p{color:var(--muted);font-size:16px;margin-bottom:36px}
+.cta-actions{display:flex;gap:16px;justify-content:center}
+
+/* FOOTER */
+footer{border-top:1px solid var(--border);padding:40px 32px;max-width:1200px;margin:0 auto}
+.footer-inner{display:flex;justify-content:space-between;align-items:center}
+.footer-inner p{color:var(--muted);font-size:13px}
+.footer-links{display:flex;gap:24px}
+.footer-links a{color:var(--muted);font-size:13px}
+
+/* RESPONSIVE */
+@media(max-width:900px){
+.hero{grid-template-columns:1fr;padding:120px 20px 60px}.terminal{margin-top:20px}
+.metrics{grid-template-columns:repeat(2,1fr)}.feature-grid{grid-template-columns:1fr}
+.compliance-cards{grid-template-columns:repeat(2,1fr)}.hero h1{font-size:36px}
+}
+@media(max-width:600px){
+.nav-links a:not(.nav-cta){display:none}.hero h1{font-size:28px}
+.hero-actions{flex-direction:column;align-items:stretch}.metrics{grid-template-columns:1fr}
+.compliance-cards{grid-template-columns:1fr}
+}
+
+/* ANIMATIONS */
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.hero-text{animation:fadeUp 0.6s ease-out}
+.terminal{animation:fadeUp 0.6s ease-out 0.2s both}
+.install-box{animation:fadeUp 0.6s ease-out 0.3s both}
+</style>
+</head>
+<body>
+
+<nav>
+<div class="nav-inner">
+<div class="logo"><div class="logo-icon"></div> agent<span style="color:var(--green)">shield</span></div>
+<div class="nav-links">
+<a href="#features">Features</a>
+<a href="#frameworks">Frameworks</a>
+<a href="pricing.html">Pricing</a>
+<a href="dashboard.html">Dashboard</a>
+<a href="https://github.com/cschuman/agent-shield" class="nav-cta">GITHUB</a>
+</div>
+</div>
+</nav>
+
+<section class="hero">
+<div class="hero-text">
+<div class="hero-badge">OPEN SOURCE &middot; RUST &middot; MIT LICENSE</div>
+<h1>Know what your AI agents <span class="accent">can do</span> before they do it.</h1>
+<p>Agent Shield discovers every AI agent in your codebase, maps their permissions, scores their risk, and generates compliance-ready audit reports. Like <code style="color:var(--green)">npm audit</code>, but for autonomous AI.</p>
+<div class="hero-actions">
+<a href="https://github.com/cschuman/agent-shield" class="btn-primary">Install CLI <span style="font-family:var(--mono);font-size:12px">&rarr;</span></a>
+<a href="dashboard.html" class="btn-secondary">See Dashboard <span style="font-family:var(--mono);font-size:12px">&rarr;</span></a>
+</div>
+</div>
+
+<div class="terminal">
+<div class="terminal-bar">
+<div class="terminal-dot r"></div><div class="terminal-dot y"></div><div class="terminal-dot g"></div>
+<span class="terminal-title">agent-shield scan ./my-project</span>
+</div>
+<div class="terminal-body">
+<span class="m">$</span> <span class="g">agent-shield</span> scan ./acme-ai-platform<br><br>
+<span class="w">======================================================</span><br>
+<span class="w">          AGENT SHIELD &mdash; Risk Assessment</span><br>
+<span class="w">======================================================</span><br><br>
+<span class="m">Scan date:</span>  2026-04-07 18:42 UTC<br>
+<span class="m">Framework:</span>  NIST AI RMF<br>
+<span class="m">Agents:</span>     <span class="w">7 discovered</span><br>
+<span class="m">Overall:</span>    <span class="r">72/100 HIGH</span><br><br>
+<span class="dim">--- Agent Inventory ---</span><br><br>
+<span class="w">Agent                Framework        Risk    Tools  Permissions</span><br>
+<span class="dim">-----                ---------        ----    -----  -----------</span><br>
+CustomerSupportBot   LangChain        <span class="r">72 HIGH</span>     8  <span class="r">EXEC</span><br>
+DataAnalysisAgent    CrewAI           <span class="y">58 MED</span>      5  READ/WRITE<br>
+CodeReviewAgent      Anthropic MCP    <span class="y">45 MED</span>      4  READ<br>
+EmailDraftAgent      OpenAI Assist.   <span class="y">52 MED</span>      3  READ/WRITE<br>
+SchedulingAgent      Custom Agent     <span class="g">28 LOW</span>      2  READ<br>
+ReportGenerator      Vercel AI        <span class="g">22 LOW</span>      1  READ<br>
+OnboardingAgent      LangGraph        <span class="y">48 MED</span>      6  READ/WRITE<br><br>
+<span class="dim">--- Critical Findings ---</span><br><br>
+<span class="r">CRITICAL</span>  CustomerSupportBot can execute system commands<br>
+<span class="m">  Fix: Remove subprocess access. Implement tool allowlisting.</span><br>
+<span class="m">  Ref: NIST AI RMF: GOVERN 1.7, MAP 3.4</span><br><br>
+<span class="r">HIGH</span>  4 of 7 agents lack input validation<br>
+<span class="m">  Fix: Add input sanitization to prevent prompt injection.</span><br><br>
+<span class="y">MEDIUM</span>  No audit trail on DataAnalysisAgent<br>
+<span class="m">  Fix: Implement logging for all agent decisions and tool calls.</span><br><br>
+<span class="m">CRITICAL: 1  HIGH: 4  MEDIUM: 8  LOW: 2</span><br>
+<span class="m">Full report: agent-shield scan --format json -o report.json</span><br>
+<span class="cursor-blink">&block;</span>
+</div>
+</div>
+</section>
+
+<div class="install-bar">
+<div class="install-box">
+<code>cargo install agent-shield</code>
+<span class="copy-hint">Copy to clipboard</span>
+</div>
+</div>
+
+<section class="metrics">
+<div class="metric"><div class="metric-value">10</div><div class="metric-label">Agent Frameworks</div></div>
+<div class="metric"><div class="metric-value">4</div><div class="metric-label">Compliance Standards</div></div>
+<div class="metric"><div class="metric-value">&lt;30s</div><div class="metric-label">Full Codebase Scan</div></div>
+<div class="metric"><div class="metric-value">MIT</div><div class="metric-label">Open Source License</div></div>
+</section>
+
+<section class="features" id="features">
+<div class="section-label">Capabilities</div>
+<h2 class="section-title">Every agent. Every risk. Every framework.</h2>
+<p class="section-subtitle">Agent Shield scans your codebase, discovers AI agents across 10 frameworks, and generates actionable risk reports mapped to compliance standards.</p>
+
+<div class="feature-grid">
+<div class="feature-card">
+<div class="feature-icon">&#x1F50D;</div>
+<h3>Agent Discovery</h3>
+<p>Automatically detects AI agents across LangChain, CrewAI, AutoGen, OpenAI Assistants, Anthropic MCP, and 5 more frameworks. Finds agents you didn't know existed.</p>
+</div>
+<div class="feature-card">
+<div class="feature-icon">&#x1F3AF;</div>
+<h3>Risk Scoring</h3>
+<p>Each agent gets a 0-100 risk score based on autonomy level, tool access, data permissions, guardrail coverage, and blast radius. NIST 4-tier autonomy classification.</p>
+</div>
+<div class="feature-card">
+<div class="feature-icon">&#x1F6E1;</div>
+<h3>Guardrail Detection</h3>
+<p>Identifies input validation, output filtering, rate limits, human-in-the-loop gates, scope restrictions, and content filters. Finds what's missing.</p>
+</div>
+<div class="feature-card">
+<div class="feature-icon">&#x1F4CB;</div>
+<h3>Compliance Mapping</h3>
+<p>Every finding maps to NIST AI RMF, ISO 42001, EU AI Act, or OWASP Agentic Top 10. Auditor-ready references, not vague recommendations.</p>
+</div>
+<div class="feature-card">
+<div class="feature-icon">&#x1F4C4;</div>
+<h3>Board-Ready Reports</h3>
+<p>Generate PDF risk scorecards that CISOs can present to their board. Not developer logs &mdash; executive summaries with clear remediation paths.</p>
+</div>
+<div class="feature-card">
+<div class="feature-icon">&#x2699;</div>
+<h3>CI/CD Integration</h3>
+<p>Run in your pipeline. Fail builds that exceed risk thresholds. Block deployments of agents without required guardrails. Shift left on AI governance.</p>
+</div>
+</div>
+</section>
+
+<section class="frameworks" id="frameworks">
+<div class="section-label">Detection</div>
+<h2 class="section-title">10 agent frameworks. Zero configuration.</h2>
+<p class="section-subtitle">Point agent-shield at a directory. It handles detection, parsing, and analysis automatically.</p>
+
+<div class="framework-grid">
+<div class="framework-tag">LangChain <span class="risk med">40</span></div>
+<div class="framework-tag">LangGraph <span class="risk med">40</span></div>
+<div class="framework-tag">CrewAI <span class="risk high">50</span></div>
+<div class="framework-tag">AutoGen <span class="risk high">50</span></div>
+<div class="framework-tag">OpenAI Assistants <span class="risk med">35</span></div>
+<div class="framework-tag">Anthropic MCP <span class="risk low">30</span></div>
+<div class="framework-tag">Anthropic Agent SDK <span class="risk med">45</span></div>
+<div class="framework-tag">AWS Bedrock Agents <span class="risk med">35</span></div>
+<div class="framework-tag">Vercel AI SDK <span class="risk low">25</span></div>
+<div class="framework-tag">Custom Agents <span class="risk high">55</span></div>
+</div>
+</section>
+
+<section class="compliance">
+<div class="section-label">Standards</div>
+<h2 class="section-title">Mapped to the frameworks that matter.</h2>
+<p class="section-subtitle">Every finding references a specific compliance control. Your auditors will thank you.</p>
+
+<div class="compliance-cards">
+<div class="compliance-card">
+<div class="badge">DEFAULT</div>
+<h4>NIST AI RMF</h4>
+<p>Govern, Map, Measure, Manage &mdash; full coverage across all four functions.</p>
+</div>
+<div class="compliance-card">
+<div class="badge">CERTIFIABLE</div>
+<h4>ISO/IEC 42001</h4>
+<p>The certifiable AI management standard. Map findings to audit controls.</p>
+</div>
+<div class="compliance-card">
+<div class="badge">AUG 2026</div>
+<h4>EU AI Act</h4>
+<p>High-risk AI obligations take effect August 2026. Start preparing now.</p>
+</div>
+<div class="compliance-card">
+<div class="badge">2026 v1</div>
+<h4>OWASP Agentic</h4>
+<p>The first security taxonomy built specifically for autonomous AI agents.</p>
+</div>
+</div>
+</section>
+
+<section class="cta-section">
+<div class="cta-box">
+<h2>Your AI agents are already deployed.<br>Do you know what they can do?</h2>
+<p>Install Agent Shield in 30 seconds. Get your first risk report in under a minute.</p>
+<div class="cta-actions">
+<a href="https://github.com/cschuman/agent-shield" class="btn-primary">Install CLI &rarr;</a>
+<a href="pricing.html" class="btn-secondary">See Pricing &rarr;</a>
+</div>
+</div>
+</section>
+
+<footer>
+<div class="footer-inner">
+<p>&copy; 2026 Agent Shield. Open source under MIT License.</p>
+<div class="footer-links">
+<a href="https://github.com/cschuman/agent-shield">GitHub</a>
+<a href="pricing.html">Pricing</a>
+<a href="dashboard.html">Dashboard</a>
+</div>
+</div>
+</footer>
+
+</body>
+</html>

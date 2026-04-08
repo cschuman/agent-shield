@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — Agent Shield</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+--bg:#0A0A0F;--surface:#13131A;--surface-2:#1A1A25;--border:#252530;
+--green:#00FF88;--green-dim:#00CC6E;--amber:#FFB800;--red:#FF3366;--blue:#4488FF;
+--text:#E8E8ED;--muted:#8888A0;--faint:#44445A;
+--mono:'JetBrains Mono',monospace;--sans:'DM Sans',sans-serif;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:var(--green);text-decoration:none}a:hover{text-decoration:underline}
+
+/* LAYOUT */
+.app{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+
+/* SIDEBAR */
+.sidebar{background:var(--surface);border-right:1px solid var(--border);padding:24px 0;display:flex;flex-direction:column}
+.sidebar-logo{padding:0 24px 24px;font-family:var(--mono);font-weight:700;font-size:16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);margin-bottom:16px}
+.sidebar-logo .icon{width:16px;height:16px;border:2px solid var(--green);transform:rotate(45deg);display:flex;align-items:center;justify-content:center}
+.sidebar-logo .icon::after{content:'';width:6px;height:6px;background:var(--green);transform:rotate(-45deg)}
+.sidebar-nav{flex:1}
+.sidebar-nav a{display:flex;align-items:center;gap:12px;padding:10px 24px;font-size:14px;color:var(--muted);transition:all 0.15s;border-left:2px solid transparent}
+.sidebar-nav a:hover{color:var(--text);background:rgba(255,255,255,0.02);text-decoration:none}
+.sidebar-nav a.active{color:var(--green);border-left-color:var(--green);background:rgba(0,255,136,0.04)}
+.sidebar-nav .icon{font-size:16px;width:20px;text-align:center}
+.sidebar-section{padding:16px 24px 8px;font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--faint);text-transform:uppercase}
+.sidebar-footer{padding:16px 24px;border-top:1px solid var(--border);font-size:12px;color:var(--faint)}
+.sidebar-footer .org{color:var(--muted);font-weight:500;display:block;margin-bottom:4px}
+
+/* MAIN CONTENT */
+.main{padding:32px;overflow-y:auto}
+.page-title{font-size:24px;font-weight:700;letter-spacing:-0.5px;margin-bottom:4px}
+.page-subtitle{color:var(--muted);font-size:14px;margin-bottom:32px}
+.demo-badge{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:1px;color:var(--amber);border:1px solid var(--amber);padding:4px 10px;margin-left:12px;vertical-align:middle}
+
+/* STATS ROW */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);margin-bottom:32px}
+.stat{background:var(--bg);padding:24px}
+.stat-label{font-size:12px;color:var(--muted);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.stat-label .trend{font-family:var(--mono);font-size:11px}
+.stat-label .trend.up{color:var(--red)}.stat-label .trend.down{color:var(--green)}
+.stat-value{font-family:var(--mono);font-size:28px;font-weight:700;letter-spacing:-1px}
+.stat-value.green{color:var(--green)}.stat-value.amber{color:var(--amber)}.stat-value.red{color:var(--red)}
+
+/* RISK GAUGE */
+.gauge-section{margin-bottom:32px;background:var(--surface);border:1px solid var(--border);padding:24px}
+.gauge-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.gauge-header h3{font-size:14px;font-weight:600}
+.gauge-header .score{font-family:var(--mono);font-size:24px;font-weight:700}
+.gauge-bar{height:8px;background:var(--border);display:flex;overflow:hidden;gap:1px}
+.gauge-segment{height:100%;transition:width 0.5s ease}
+.gauge-legend{display:flex;gap:24px;margin-top:12px}
+.gauge-legend span{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.gauge-legend .dot{width:8px;height:8px}
+.gauge-legend .dot.green{background:var(--green)}.gauge-legend .dot.amber{background:var(--amber)}.gauge-legend .dot.red{background:var(--red)}.gauge-legend .dot.crit{background:#CC0044}
+
+/* CONTENT GRID */
+.content-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:32px}
+
+/* AGENT TABLE */
+.panel{background:var(--surface);border:1px solid var(--border)}
+.panel-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.panel-header h3{font-size:14px;font-weight:600}
+.panel-header .count{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.agent-table{width:100%}
+.agent-table th{text-align:left;padding:10px 20px;font-size:11px;font-family:var(--mono);letter-spacing:1px;color:var(--faint);text-transform:uppercase;border-bottom:1px solid var(--border)}
+.agent-table td{padding:12px 20px;font-size:13px;border-bottom:1px solid var(--border)}
+.agent-table tr:hover td{background:rgba(255,255,255,0.01)}
+.agent-name{font-weight:600;display:flex;align-items:center;gap:8px}
+.agent-name .framework-dot{width:8px;height:8px;border:1px solid var(--muted)}
+.risk-badge{font-family:var(--mono);font-size:12px;font-weight:600;padding:3px 8px;border:1px solid}
+.risk-badge.low{color:var(--green);border-color:var(--green)}.risk-badge.med{color:var(--amber);border-color:var(--amber)}
+.risk-badge.high{color:var(--red);border-color:var(--red)}.risk-badge.crit{color:#FF1144;border-color:#FF1144;font-weight:700}
+.autonomy{font-family:var(--mono);font-size:12px;color:var(--muted)}
+
+/* FINDINGS */
+.finding-item{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:flex-start}
+.finding-item:hover{background:rgba(255,255,255,0.01)}
+.finding-severity{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:0.5px;padding:3px 8px;border:1px solid;flex-shrink:0;margin-top:2px}
+.finding-severity.critical{color:var(--red);border-color:var(--red)}.finding-severity.high{color:var(--red);border-color:rgba(255,51,102,0.5)}
+.finding-severity.medium{color:var(--amber);border-color:rgba(255,184,0,0.5)}.finding-severity.low{color:var(--blue);border-color:rgba(68,136,255,0.5)}
+.finding-content h4{font-size:13px;font-weight:600;margin-bottom:4px}
+.finding-content p{font-size:12px;color:var(--muted)}
+.finding-content .ref{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:4px}
+
+/* COMPLIANCE PROGRESS */
+.compliance-item{padding:16px 20px;border-bottom:1px solid var(--border)}
+.compliance-item:last-child{border-bottom:none}
+.compliance-name{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.compliance-name h4{font-size:13px;font-weight:600}
+.compliance-name .pct{font-family:var(--mono);font-size:13px;font-weight:600}
+.compliance-bar{height:4px;background:var(--border);overflow:hidden}
+.compliance-fill{height:100%;transition:width 0.5s ease}
+.compliance-fill.good{background:var(--green)}.compliance-fill.warn{background:var(--amber)}.compliance-fill.bad{background:var(--red)}
+
+/* ACTIVITY */
+.activity-item{padding:12px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:13px}
+.activity-item:hover{background:rgba(255,255,255,0.01)}
+.activity-event{display:flex;align-items:center;gap:8px}
+.activity-dot{width:6px;height:6px;flex-shrink:0}
+.activity-dot.new{background:var(--green)}.activity-dot.risk{background:var(--red)}.activity-dot.change{background:var(--amber)}
+.activity-time{font-family:var(--mono);font-size:11px;color:var(--faint)}
+
+@media(max-width:1000px){.app{grid-template-columns:1fr}.sidebar{display:none}.content-grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+
+<div class="app">
+<aside class="sidebar">
+<div class="sidebar-logo"><div class="icon"></div> agent<span style="color:var(--green)">shield</span></div>
+<nav class="sidebar-nav">
+<div class="sidebar-section">Overview</div>
+<a href="#" class="active"><span class="icon">&#x25A0;</span> Dashboard</a>
+<a href="#"><span class="icon">&#x25CB;</span> Agents</a>
+<a href="#"><span class="icon">&#x25B2;</span> Findings</a>
+<a href="#"><span class="icon">&#x25C6;</span> Reports</a>
+<div class="sidebar-section">Compliance</div>
+<a href="#"><span class="icon">&#x2610;</span> NIST AI RMF</a>
+<a href="#"><span class="icon">&#x2610;</span> ISO 42001</a>
+<a href="#"><span class="icon">&#x2610;</span> EU AI Act</a>
+<a href="#"><span class="icon">&#x2610;</span> OWASP Agentic</a>
+<div class="sidebar-section">Settings</div>
+<a href="#"><span class="icon">&#x2699;</span> Integrations</a>
+<a href="#"><span class="icon">&#x2691;</span> Team</a>
+<a href="#"><span class="icon">&#x2630;</span> API Keys</a>
+</nav>
+<div class="sidebar-footer">
+<span class="org">Acme Corp</span>
+Business Plan &middot; 37/100 agents
+</div>
+</aside>
+
+<main class="main">
+<h1 class="page-title">Security Overview <span class="demo-badge">DASHBOARD PREVIEW</span></h1>
+<p class="page-subtitle">Last scan: 4 minutes ago &middot; Next scheduled: 2h 56m &middot; 37 agents across 6 repositories</p>
+
+<div class="stats">
+<div class="stat">
+<div class="stat-label">Total Agents <span class="trend up">+3 this week</span></div>
+<div class="stat-value">37</div>
+</div>
+<div class="stat">
+<div class="stat-label">Overall Risk <span class="trend down">-4 pts</span></div>
+<div class="stat-value amber">62/100</div>
+</div>
+<div class="stat">
+<div class="stat-label">Critical Findings</div>
+<div class="stat-value red">4</div>
+</div>
+<div class="stat">
+<div class="stat-label">Compliance Score</div>
+<div class="stat-value green">71%</div>
+</div>
+</div>
+
+<div class="gauge-section">
+<div class="gauge-header">
+<h3>Risk Distribution</h3>
+<div class="score" style="color:var(--amber)">62/100 MEDIUM</div>
+</div>
+<div class="gauge-bar">
+<div class="gauge-segment" style="width:27%;background:var(--green)"></div>
+<div class="gauge-segment" style="width:38%;background:var(--amber)"></div>
+<div class="gauge-segment" style="width:24%;background:var(--red)"></div>
+<div class="gauge-segment" style="width:11%;background:#CC0044"></div>
+</div>
+<div class="gauge-legend">
+<span><span class="dot green"></span>Low (10)</span>
+<span><span class="dot amber"></span>Medium (14)</span>
+<span><span class="dot red"></span>High (9)</span>
+<span><span class="dot crit"></span>Critical (4)</span>
+</div>
+</div>
+
+<div class="content-grid">
+<div class="panel" style="grid-column:1/-1">
+<div class="panel-header"><h3>Agent Inventory</h3><span class="count">37 agents &middot; 6 repos</span></div>
+<table class="agent-table">
+<thead><tr><th>Agent</th><th>Framework</th><th>Risk</th><th>Tools</th><th>Guardrails</th><th>Autonomy</th><th>Last Scan</th></tr></thead>
+<tbody>
+<tr>
+<td><span class="agent-name"><span class="framework-dot" style="background:var(--red)"></span>CustomerSupportBot</span></td>
+<td style="color:var(--muted);font-size:12px">LangChain</td>
+<td><span class="risk-badge crit">92</span></td>
+<td style="font-family:var(--mono);font-size:12px">12</td>
+<td style="font-family:var(--mono);font-size:12px">1</td>
+<td class="autonomy">T4</td>
+<td style="font-family:var(--mono);font-size:11px;color:var(--faint)">4m ago</td>
+</tr>
+<tr>
+<td><span class="agent-name"><span class="framework-dot" style="background:var(--red)"></span>PaymentProcessor</span></td>
+<td style="color:var(--muted);font-size:12px">Custom Agent</td>
+<td><span class="risk-badge crit">88</span></td>
+<td style="font-family:var(--mono);font-size:12px">6</td>
+<td style="font-family:var(--mono);font-size:12px">2</td>
+<td class="autonomy">T4</td>
+<td style="font-family:var(--mono);font-size:11px;color:var(--faint)">4m ago</td>
+</tr>
+<tr>
+<td><span class="agent-name"><span class="framework-dot" style="background:var(--red)"></span>DataPipelineAgent</span></td>
+<td style="color:var(--muted);font-size:12px">CrewAI</td>
+<td><span class="risk-badge high">74</span></td>
+<td style="font-family:var(--mono);font-size:12px">8</td>
+<td style="font-family:var(--mono);font-size:12px">3</td>
+<td class="autonomy">T3</td>
+<td style="font-family:var(--mono);font-size:11px;color:var(--faint)">4m ago</td>
+</tr>
+<tr>
+<td><span class="agent-name"><span class="framework-dot" style="background:var(--amber)"></span>CodeReviewBot</span></td>
+<td style="color:var(--muted);font-size:12px">Anthropic MCP</td>
+<td><span class="risk-badge med">52</span></td>
+<td style="font-family:var(--mono);font-size:12px">4</td>
+<td style="font-family:var(--mono);font-size:12px">5</td>
+<td class="autonomy">T2</td>
+<td style="font-family:var(--mono);font-size:11px;color:var(--faint)">4m ago</td>
+</tr>
+<tr>
+<td><span class="agent-name"><span class="framework-dot" style="background:var(--amber)"></span>OnboardingAssistant</span></td>
+<td style="color:var(--muted);font-size:12px">OpenAI Assistants</td>
+<td><span class="risk-badge med">45</span></td>
+<td style="font-family:var(--mono);font-size:12px">3</td>
+<td style="font-family:var(--mono);font-size:12px">4</td>
+<td class="autonomy">T2</td>
+<td style="font-family:var(--mono);font-size:11px;color:var(--faint)">4m ago</td>
+</tr>
+<tr>
+<td><span class="agent-name"><span class="framework-dot" style="background:var(--green)"></span>FAQResponder</span></td>
+<td style="color:var(--muted);font-size:12px">Vercel AI SDK</td>
+<td><span class="risk-badge low">18</span></td>
+<td style="font-family:var(--mono);font-size:12px">1</td>
+<td style="font-family:var(--mono);font-size:12px">6</td>
+<td class="autonomy">T1</td>
+<td style="font-family:var(--mono);font-size:11px;color:var(--faint)">4m ago</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<div class="content-grid">
+<div class="panel">
+<div class="panel-header"><h3>Critical Findings</h3><span class="count">4 critical &middot; 9 high</span></div>
+<div class="finding-item">
+<span class="finding-severity critical">CRIT</span>
+<div class="finding-content">
+<h4>CustomerSupportBot can execute system commands</h4>
+<p>Agent has subprocess access without allowlisting. Blast radius: full system.</p>
+<div class="ref">NIST AI RMF: GOVERN 1.7 &middot; OWASP A01</div>
+</div>
+</div>
+<div class="finding-item">
+<span class="finding-severity critical">CRIT</span>
+<div class="finding-content">
+<h4>PaymentProcessor has admin-level permissions</h4>
+<p>Agent operates with elevated privileges on payment database.</p>
+<div class="ref">NIST AI RMF: MANAGE 4.1 &middot; ISO 42001 A.8.4</div>
+</div>
+</div>
+<div class="finding-item">
+<span class="finding-severity high">HIGH</span>
+<div class="finding-content">
+<h4>5 agents lack input validation</h4>
+<p>No prompt injection protection detected on 5 of 37 agents.</p>
+<div class="ref">OWASP Agentic A02 &middot; NIST MANAGE 2.2</div>
+</div>
+</div>
+<div class="finding-item">
+<span class="finding-severity high">HIGH</span>
+<div class="finding-content">
+<h4>DataPipelineAgent missing audit trail</h4>
+<p>No logging detected for agent decisions or tool invocations.</p>
+<div class="ref">EU AI Act Article 12 &middot; ISO 42001 A.8.5</div>
+</div>
+</div>
+<div class="finding-item">
+<span class="finding-severity medium">MED</span>
+<div class="finding-content">
+<h4>3 agents exceed 10-tool threshold</h4>
+<p>Excessive tool access increases attack surface and blast radius.</p>
+<div class="ref">NIST AI RMF: MAP 1.1</div>
+</div>
+</div>
+</div>
+
+<div class="panel">
+<div class="panel-header"><h3>Compliance Readiness</h3><span class="count">4 frameworks</span></div>
+<div class="compliance-item">
+<div class="compliance-name"><h4>NIST AI RMF</h4><span class="pct" style="color:var(--green)">78%</span></div>
+<div class="compliance-bar"><div class="compliance-fill good" style="width:78%"></div></div>
+</div>
+<div class="compliance-item">
+<div class="compliance-name"><h4>ISO/IEC 42001</h4><span class="pct" style="color:var(--amber)">64%</span></div>
+<div class="compliance-bar"><div class="compliance-fill warn" style="width:64%"></div></div>
+</div>
+<div class="compliance-item">
+<div class="compliance-name"><h4>EU AI Act (High-Risk)</h4><span class="pct" style="color:var(--red)">41%</span></div>
+<div class="compliance-bar"><div class="compliance-fill bad" style="width:41%"></div></div>
+</div>
+<div class="compliance-item">
+<div class="compliance-name"><h4>OWASP Agentic Top 10</h4><span class="pct" style="color:var(--amber)">56%</span></div>
+<div class="compliance-bar"><div class="compliance-fill warn" style="width:56%"></div></div>
+</div>
+
+<div style="padding:20px;border-top:1px solid var(--border)">
+<div class="panel-header" style="padding:0 0 12px;border:none"><h3>Recent Activity</h3></div>
+<div class="activity-item">
+<span class="activity-event"><span class="activity-dot new"></span>New agent detected: InvoiceProcessor</span>
+<span class="activity-time">12m ago</span>
+</div>
+<div class="activity-item">
+<span class="activity-event"><span class="activity-dot risk"></span>Risk increase: CustomerSupportBot 78 &rarr; 92</span>
+<span class="activity-time">2h ago</span>
+</div>
+<div class="activity-item">
+<span class="activity-event"><span class="activity-dot change"></span>Guardrail added: OnboardingAssistant</span>
+<span class="activity-time">1d ago</span>
+</div>
+<div class="activity-item">
+<span class="activity-event"><span class="activity-dot new"></span>Scan completed: acme-platform repo</span>
+<span class="activity-time">1d ago</span>
+</div>
+<div class="activity-item">
+<span class="activity-event"><span class="activity-dot risk"></span>New finding: Missing audit trail on DataPipeline</span>
+<span class="activity-time">2d ago</span>
+</div>
+</div>
+</div>
+</div>
+
+</main>
+</div>
+
+</body>
+</html>

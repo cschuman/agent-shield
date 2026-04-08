@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings — Agent Shield</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0A0A0F;--surface:#13131A;--border:#252530;
+  --green:#00FF88;--amber:#FFB800;--red:#FF3366;--blue:#4488FF;
+  --text:#E8E8ED;--muted:#8888A0;--faint:#44445A;
+  --mono:'JetBrains Mono',monospace;--sans:'DM Sans',sans-serif;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:var(--green);text-decoration:none}a:hover{text-decoration:underline}
+button{font-family:var(--sans)}
+
+/* LAYOUT */
+.app{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+
+/* SIDEBAR */
+.sidebar{background:var(--surface);border-right:1px solid var(--border);padding:24px 0;display:flex;flex-direction:column}
+.sidebar-logo{padding:0 24px 24px;font-family:var(--mono);font-weight:700;font-size:16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);margin-bottom:16px}
+.sidebar-logo .icon{width:16px;height:16px;border:2px solid var(--green);transform:rotate(45deg);display:flex;align-items:center;justify-content:center}
+.sidebar-logo .icon::after{content:'';width:6px;height:6px;background:var(--green);transform:rotate(-45deg)}
+.sidebar-nav{flex:1}
+.sidebar-nav a{display:flex;align-items:center;gap:12px;padding:10px 24px;font-size:14px;color:var(--muted);transition:all 0.15s;border-left:2px solid transparent}
+.sidebar-nav a:hover{color:var(--text);background:rgba(255,255,255,0.02);text-decoration:none}
+.sidebar-nav a.active{color:var(--green);border-left-color:var(--green);background:rgba(0,255,136,0.04)}
+.sidebar-nav .icon{font-size:16px;width:20px;text-align:center}
+.sidebar-section{padding:16px 24px 8px;font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--faint);text-transform:uppercase}
+.sidebar-footer{padding:16px 24px;border-top:1px solid var(--border);font-size:12px;color:var(--faint)}
+.sidebar-footer .org{color:var(--muted);font-weight:500;display:block;margin-bottom:4px}
+
+/* MAIN */
+.main{padding:32px;overflow-y:auto}
+.page-title{font-size:24px;font-weight:700;letter-spacing:-0.5px;margin-bottom:4px}
+.page-subtitle{color:var(--muted);font-size:14px;margin-bottom:32px}
+
+/* TABS */
+.tabs{
+  display:flex;border-bottom:1px solid var(--border);
+  margin-bottom:32px;gap:0;
+}
+.tab{
+  padding:10px 20px;font-size:14px;font-weight:500;color:var(--muted);
+  cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;
+}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--green);border-bottom-color:var(--green)}
+
+/* FORM LAYOUT */
+.settings-section{margin-bottom:40px}
+.settings-section h2{
+  font-size:14px;font-weight:600;
+  margin-bottom:20px;padding-bottom:10px;
+  border-bottom:1px solid var(--border);color:var(--text);
+}
+
+.form-row{
+  display:grid;grid-template-columns:220px 1fr;
+  align-items:start;gap:24px;
+  padding:16px 0;border-bottom:1px solid var(--border);
+}
+.form-row:last-child{border-bottom:none}
+.form-label{font-size:13px;font-weight:500;padding-top:2px}
+.form-label p{font-size:12px;color:var(--muted);font-weight:400;margin-top:4px}
+
+.text-input{
+  width:100%;max-width:400px;
+  background:var(--surface);border:1px solid var(--border);
+  color:var(--text);font-size:14px;font-family:var(--sans);
+  padding:8px 12px;outline:none;
+}
+.text-input:focus{border-color:var(--green)}
+
+.select-input{
+  width:100%;max-width:400px;
+  background:var(--surface);border:1px solid var(--border);
+  color:var(--text);font-size:14px;font-family:var(--sans);
+  padding:8px 12px;outline:none;
+  appearance:none;cursor:pointer;
+}
+.select-input:focus{border-color:var(--green)}
+
+/* TOGGLE */
+.toggle-row{display:flex;align-items:center;justify-content:space-between;max-width:400px}
+.toggle-row span{font-size:13px;color:var(--muted)}
+.toggle-switch{
+  width:40px;height:22px;background:var(--border);
+  position:relative;cursor:pointer;flex-shrink:0;
+}
+.toggle-switch.on{background:var(--green)}
+.toggle-switch::after{
+  content:'';position:absolute;top:3px;left:3px;
+  width:16px;height:16px;background:var(--bg);
+  transition:transform 0.15s;
+}
+.toggle-switch.on::after{transform:translateX(18px);background:var(--bg)}
+
+/* SAVE BUTTON */
+.save-btn{
+  padding:10px 24px;
+  background:var(--green);color:var(--bg);
+  font-size:13px;font-weight:700;border:none;cursor:pointer;
+  margin-top:24px;
+}
+.save-btn:hover{background:#00FFAA}
+
+/* API KEY TABLE */
+.key-table{width:100%;border-collapse:collapse;margin-bottom:20px}
+.key-table th{
+  text-align:left;padding:8px 16px;
+  font-size:11px;font-family:var(--mono);letter-spacing:1px;
+  color:var(--faint);text-transform:uppercase;
+  border-bottom:1px solid var(--border);
+}
+.key-table td{
+  padding:12px 16px;font-size:13px;
+  border-bottom:1px solid var(--border);
+  vertical-align:middle;
+}
+.key-table tr:last-child td{border-bottom:none}
+.key-table tr:hover td{background:rgba(255,255,255,0.01)}
+.key-name{font-weight:600}
+.key-value{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.key-date{font-family:var(--mono);font-size:11px;color:var(--faint)}
+.revoke-btn{
+  font-family:var(--mono);font-size:11px;
+  color:var(--red);border:1px solid rgba(255,51,102,0.4);
+  background:transparent;padding:4px 10px;cursor:pointer;
+}
+.revoke-btn:hover{border-color:var(--red);background:rgba(255,51,102,0.05)}
+.status-dot{
+  display:inline-block;width:7px;height:7px;
+  margin-right:6px;
+}
+.status-dot.active{background:var(--green)}
+.status-dot.unused{background:var(--faint)}
+
+.new-key-btn{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:9px 18px;
+  border:1px solid var(--green);color:var(--green);
+  font-size:13px;font-weight:600;background:transparent;cursor:pointer;
+}
+.new-key-btn:hover{background:rgba(0,255,136,0.05)}
+
+/* TAB CONTENT (hidden tabs shown structurally) */
+.tab-content{display:none}
+.tab-content.active{display:block}
+
+/* TEAM */
+.team-member{
+  display:flex;align-items:center;gap:16px;
+  padding:14px 0;border-bottom:1px solid var(--border);
+}
+.team-member:last-child{border-bottom:none}
+.avatar{
+  width:36px;height:36px;background:var(--surface);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:13px;font-weight:700;color:var(--green);
+  flex-shrink:0;
+}
+.member-info{flex:1}
+.member-name{font-size:14px;font-weight:500}
+.member-email{font-size:12px;color:var(--muted)}
+.role-badge{
+  font-family:var(--mono);font-size:11px;padding:3px 8px;
+  border:1px solid var(--border);color:var(--muted);
+}
+.role-badge.admin{border-color:var(--green);color:var(--green)}
+
+/* BILLING */
+.billing-card{
+  border:1px solid var(--border);background:var(--surface);
+  padding:24px;margin-bottom:16px;
+  display:flex;justify-content:space-between;align-items:center;
+}
+.billing-plan{font-size:18px;font-weight:700;margin-bottom:4px}
+.billing-amount{font-family:var(--mono);font-size:24px;font-weight:700;color:var(--green)}
+.billing-cycle{font-size:12px;color:var(--muted)}
+
+@media(max-width:1000px){.app{grid-template-columns:1fr}.sidebar{display:none}.form-row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-logo"><div class="icon"></div> agent<span style="color:var(--green)">shield</span></div>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section">Overview</div>
+      <a href="../dashboard.html"><span class="icon">&#x25A0;</span> Dashboard</a>
+      <a href="#"><span class="icon">&#x25CB;</span> Agents</a>
+      <a href="#"><span class="icon">&#x25B2;</span> Findings</a>
+      <a href="#"><span class="icon">&#x25C6;</span> Reports</a>
+      <div class="sidebar-section">Compliance</div>
+      <a href="#"><span class="icon">&#x2610;</span> NIST AI RMF</a>
+      <a href="#"><span class="icon">&#x2610;</span> ISO 42001</a>
+      <a href="#"><span class="icon">&#x2610;</span> EU AI Act</a>
+      <a href="#"><span class="icon">&#x2610;</span> OWASP Agentic</a>
+      <div class="sidebar-section">Settings</div>
+      <a href="#" class="active"><span class="icon">&#x2699;</span> Settings</a>
+      <a href="#"><span class="icon">&#x2691;</span> Team</a>
+      <a href="#"><span class="icon">&#x2630;</span> API Keys</a>
+    </nav>
+    <div class="sidebar-footer">
+      <span class="org">Acme Corp</span>
+      Business Plan &middot; 37/100 agents
+    </div>
+  </aside>
+
+  <main class="main">
+    <h1 class="page-title">Settings</h1>
+    <p class="page-subtitle">Manage your organization, API keys, team, and billing.</p>
+
+    <div class="tabs">
+      <div class="tab active" onclick="showTab('general')">General</div>
+      <div class="tab" onclick="showTab('api-keys')">API Keys</div>
+      <div class="tab" onclick="showTab('team')">Team</div>
+      <div class="tab" onclick="showTab('billing')">Billing</div>
+    </div>
+
+    <!-- GENERAL TAB -->
+    <div id="tab-general" class="tab-content active">
+
+      <div class="settings-section">
+        <h2>Organization</h2>
+
+        <div class="form-row">
+          <div class="form-label">
+            Organization name
+            <p>Shown on reports and audit exports.</p>
+          </div>
+          <div>
+            <input class="text-input" type="text" value="Acme Corp">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-label">
+            Organization slug
+            <p>Used in dashboard URLs.</p>
+          </div>
+          <div>
+            <input class="text-input" type="text" value="acme-corp" style="color:var(--muted)">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-label">
+            Primary contact email
+            <p>Where scan alerts and reports are sent.</p>
+          </div>
+          <div>
+            <input class="text-input" type="email" value="security@acmecorp.io">
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h2>Scan Schedule</h2>
+
+        <div class="form-row">
+          <div class="form-label">
+            Default scan frequency
+            <p>How often Agent Shield scans connected repos.</p>
+          </div>
+          <div>
+            <select class="select-input">
+              <option>Every 6 hours</option>
+              <option selected>Every 12 hours</option>
+              <option>Daily</option>
+              <option>Weekly</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-label">
+            Scan on push
+            <p>Trigger a scan automatically on every git push.</p>
+          </div>
+          <div>
+            <div class="toggle-row">
+              <span>Enable push-triggered scans</span>
+              <div class="toggle-switch on"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-label">
+            Fail CI on critical findings
+            <p>Block builds when a CRITICAL finding is detected.</p>
+          </div>
+          <div>
+            <div class="toggle-row">
+              <span>Enable CI gate</span>
+              <div class="toggle-switch on"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h2>Notifications</h2>
+
+        <div class="form-row">
+          <div class="form-label">New agent detected</div>
+          <div>
+            <div class="toggle-row">
+              <span>Email alert when a new agent appears in a scan</span>
+              <div class="toggle-switch on"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-label">Risk score increase</div>
+          <div>
+            <div class="toggle-row">
+              <span>Alert when any agent's risk score rises 10+ points</span>
+              <div class="toggle-switch on"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-label">Weekly digest</div>
+          <div>
+            <div class="toggle-row">
+              <span>Weekly summary email every Monday</span>
+              <div class="toggle-switch"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button class="save-btn">Save Changes</button>
+    </div>
+
+    <!-- API KEYS TAB -->
+    <div id="tab-api-keys" class="tab-content">
+
+      <div class="settings-section">
+        <h2>API Keys</h2>
+        <table class="key-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Key</th>
+              <th>Created</th>
+              <th>Last Used</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="key-name">Production CI</td>
+              <td class="key-value">sk-as-prod-4f8a2c...3e</td>
+              <td class="key-date">2026-01-14</td>
+              <td class="key-date">2026-04-07</td>
+              <td><span class="status-dot active"></span><span style="font-size:12px;color:var(--green)">Active</span></td>
+              <td><button class="revoke-btn">Revoke</button></td>
+            </tr>
+            <tr>
+              <td class="key-name">Local Dev</td>
+              <td class="key-value">sk-as-dev-9b1d3f...7a</td>
+              <td class="key-date">2026-02-28</td>
+              <td class="key-date">2026-04-05</td>
+              <td><span class="status-dot active"></span><span style="font-size:12px;color:var(--green)">Active</span></td>
+              <td><button class="revoke-btn">Revoke</button></td>
+            </tr>
+            <tr>
+              <td class="key-name">Staging Pipeline</td>
+              <td class="key-value">sk-as-stg-c2e4a8...1b</td>
+              <td class="key-date">2026-03-10</td>
+              <td class="key-date">Never</td>
+              <td><span class="status-dot unused"></span><span style="font-size:12px;color:var(--faint)">Unused</span></td>
+              <td><button class="revoke-btn">Revoke</button></td>
+            </tr>
+          </tbody>
+        </table>
+        <button class="new-key-btn">+ Generate New Key</button>
+      </div>
+
+    </div>
+
+    <!-- TEAM TAB -->
+    <div id="tab-team" class="tab-content">
+
+      <div class="settings-section">
+        <h2>Team Members</h2>
+
+        <div class="team-member">
+          <div class="avatar">CS</div>
+          <div class="member-info">
+            <div class="member-name">Corey Schuman</div>
+            <div class="member-email">corey@acmecorp.io</div>
+          </div>
+          <span class="role-badge admin">ADMIN</span>
+        </div>
+        <div class="team-member">
+          <div class="avatar">JR</div>
+          <div class="member-info">
+            <div class="member-name">Jessica Ramirez</div>
+            <div class="member-email">jessica@acmecorp.io</div>
+          </div>
+          <span class="role-badge">MEMBER</span>
+        </div>
+        <div class="team-member">
+          <div class="avatar">MK</div>
+          <div class="member-info">
+            <div class="member-name">Marcus Kim</div>
+            <div class="member-email">marcus@acmecorp.io</div>
+          </div>
+          <span class="role-badge">MEMBER</span>
+        </div>
+        <div class="team-member">
+          <div class="avatar">AL</div>
+          <div class="member-info">
+            <div class="member-name">Audrey Liu</div>
+            <div class="member-email">audrey@acmecorp.io</div>
+          </div>
+          <span class="role-badge">VIEWER</span>
+        </div>
+
+        <div style="margin-top:20px">
+          <button class="new-key-btn">+ Invite Team Member</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- BILLING TAB -->
+    <div id="tab-billing" class="tab-content">
+
+      <div class="settings-section">
+        <h2>Current Plan</h2>
+
+        <div class="billing-card">
+          <div>
+            <div class="billing-plan">Business</div>
+            <div style="font-size:13px;color:var(--muted)">Up to 100 agents &middot; Continuous monitoring &middot; EU AI Act mapping</div>
+            <div style="font-size:12px;color:var(--faint);margin-top:8px">Next billing date: May 1, 2026</div>
+          </div>
+          <div style="text-align:right">
+            <div class="billing-amount">$5,000</div>
+            <div class="billing-cycle">per month</div>
+          </div>
+        </div>
+
+        <div style="padding:16px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;font-size:13px">
+          <span style="color:var(--muted)">Agents monitored this month</span>
+          <span style="font-family:var(--mono)">37 / 100</span>
+        </div>
+        <div style="padding:16px 0;display:flex;justify-content:space-between;font-size:13px">
+          <span style="color:var(--muted)">Overage rate</span>
+          <span style="font-family:var(--mono)">$50 / agent / mo</span>
+        </div>
+
+        <div style="margin-top:24px;display:flex;gap:12px">
+          <button class="new-key-btn">Upgrade to Enterprise</button>
+          <button style="padding:9px 18px;border:1px solid var(--border);color:var(--muted);background:transparent;font-size:13px;cursor:pointer">Manage Billing</button>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+</div>
+
+<script>
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(function(t, i) {
+    t.classList.remove('active');
+  });
+  document.querySelectorAll('.tab-content').forEach(function(c) {
+    c.classList.remove('active');
+  });
+  var tabs = document.querySelectorAll('.tab');
+  var tabMap = ['general','api-keys','team','billing'];
+  var idx = tabMap.indexOf(name);
+  if (idx >= 0) tabs[idx].classList.add('active');
+  var el = document.getElementById('tab-' + name);
+  if (el) el.classList.add('active');
+}
+</script>
+
+</body>
+</html>

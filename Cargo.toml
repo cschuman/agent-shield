@@ -1,0 +1,27 @@
+[package]
+name = "agent-shield"
+version = "0.1.0"
+edition = "2024"
+description = "AI Agent Audit Scanner — npm audit for AI agents"
+license = "MIT"
+repository = "https://github.com/cschuman/agent-shield"
+keywords = ["ai", "agents", "security", "audit", "compliance"]
+categories = ["command-line-utilities", "development-tools"]
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+walkdir = "2"
+regex = "1"
+colored = "2"
+comfy-table = "7"
+glob = "0.3"
+toml = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "2"
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true

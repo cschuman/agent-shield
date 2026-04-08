@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CustomerSupportBot — Agent Shield</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0A0A0F;--surface:#13131A;--border:#252530;
+  --green:#00FF88;--amber:#FFB800;--red:#FF3366;--blue:#4488FF;
+  --text:#E8E8ED;--muted:#8888A0;--faint:#44445A;
+  --mono:'JetBrains Mono',monospace;--sans:'DM Sans',sans-serif;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:var(--green);text-decoration:none}a:hover{text-decoration:underline}
+
+/* LAYOUT */
+.app{display:grid;grid-template-columns:240px 1fr;min-height:100vh}
+
+/* SIDEBAR — matches dashboard */
+.sidebar{background:var(--surface);border-right:1px solid var(--border);padding:24px 0;display:flex;flex-direction:column}
+.sidebar-logo{padding:0 24px 24px;font-family:var(--mono);font-weight:700;font-size:16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);margin-bottom:16px}
+.sidebar-logo .icon{width:16px;height:16px;border:2px solid var(--green);transform:rotate(45deg);display:flex;align-items:center;justify-content:center}
+.sidebar-logo .icon::after{content:'';width:6px;height:6px;background:var(--green);transform:rotate(-45deg)}
+.sidebar-nav{flex:1}
+.sidebar-nav a{display:flex;align-items:center;gap:12px;padding:10px 24px;font-size:14px;color:var(--muted);transition:all 0.15s;border-left:2px solid transparent}
+.sidebar-nav a:hover{color:var(--text);background:rgba(255,255,255,0.02);text-decoration:none}
+.sidebar-nav a.active{color:var(--green);border-left-color:var(--green);background:rgba(0,255,136,0.04)}
+.sidebar-nav .icon{font-size:16px;width:20px;text-align:center}
+.sidebar-section{padding:16px 24px 8px;font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--faint);text-transform:uppercase}
+.sidebar-footer{padding:16px 24px;border-top:1px solid var(--border);font-size:12px;color:var(--faint)}
+.sidebar-footer .org{color:var(--muted);font-weight:500;display:block;margin-bottom:4px}
+
+/* MAIN */
+.main{padding:32px;overflow-y:auto}
+
+/* BREADCRUMB */
+.breadcrumb{font-size:13px;color:var(--muted);margin-bottom:20px;display:flex;align-items:center;gap:8px;font-family:var(--mono)}
+.breadcrumb a{color:var(--muted)}
+.breadcrumb span{color:var(--faint)}
+
+/* AGENT HEADER */
+.agent-header{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  margin-bottom:32px;padding-bottom:24px;border-bottom:1px solid var(--border);
+}
+.agent-title h1{font-size:24px;font-weight:700;letter-spacing:-0.5px;margin-bottom:6px}
+.agent-meta{display:flex;gap:16px;align-items:center;font-size:13px;color:var(--muted)}
+.meta-pill{
+  font-family:var(--mono);font-size:11px;padding:4px 10px;
+  border:1px solid var(--border);color:var(--muted);
+}
+.framework-pill{border-color:var(--blue);color:var(--blue)}
+
+.risk-score-block{text-align:right;flex-shrink:0}
+.risk-number{font-family:var(--mono);font-size:40px;font-weight:700;color:var(--red);line-height:1}
+.risk-label{font-family:var(--mono);font-size:11px;color:var(--red);letter-spacing:2px;margin-top:4px}
+.risk-gauge{
+  width:120px;height:8px;background:var(--border);margin-top:10px;
+  display:flex;overflow:hidden;
+}
+.risk-fill{height:100%;background:var(--red);width:72%}
+
+/* FILE PATH */
+.filepath{
+  font-family:var(--mono);font-size:12px;color:var(--muted);
+  margin-top:6px;display:flex;align-items:center;gap:8px;
+}
+.filepath code{color:var(--faint)}
+
+/* SECTIONS */
+.section{margin-bottom:32px}
+.section-title{
+  font-size:13px;font-weight:600;font-family:var(--mono);
+  letter-spacing:1px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:14px;
+  padding-bottom:8px;border-bottom:1px solid var(--border);
+}
+
+/* TWO-COL LAYOUT */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:32px}
+.one-col{margin-bottom:32px}
+
+/* PANEL */
+.panel{background:var(--surface);border:1px solid var(--border)}
+.panel-header{
+  padding:14px 20px;border-bottom:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:center;
+}
+.panel-header h3{font-size:13px;font-weight:600;font-family:var(--mono);letter-spacing:0.5px;text-transform:uppercase;color:var(--muted)}
+.panel-header .count{font-family:var(--mono);font-size:11px;color:var(--faint)}
+
+/* TOOL TABLE */
+.tool-table{width:100%;border-collapse:collapse}
+.tool-table th{
+  text-align:left;padding:8px 20px;
+  font-size:11px;font-family:var(--mono);letter-spacing:1px;color:var(--faint);
+  text-transform:uppercase;border-bottom:1px solid var(--border);
+}
+.tool-table td{
+  padding:10px 20px;font-size:13px;
+  border-bottom:1px solid var(--border);
+}
+.tool-table tr:last-child td{border-bottom:none}
+.tool-table tr:hover td{background:rgba(255,255,255,0.01)}
+.tool-name{font-family:var(--mono);font-size:12px;font-weight:500}
+.confirm-badge{
+  font-family:var(--mono);font-size:11px;padding:2px 7px;
+  border:1px solid;
+}
+.confirm-badge.yes{color:var(--green);border-color:var(--green)}
+.confirm-badge.no{color:var(--red);border-color:var(--red)}
+.confirm-badge.na{color:var(--faint);border-color:var(--faint)}
+
+/* CODE BLOCK */
+.code-block{
+  background:var(--bg);border:1px solid var(--border);
+  font-family:var(--mono);font-size:12px;color:var(--muted);
+  padding:16px 20px;line-height:1.8;
+  overflow-x:auto;white-space:pre;
+}
+.code-block .highlight{color:var(--text)}
+.code-block .comment{color:var(--faint)}
+
+/* TAG LIST */
+.tag-list{display:flex;flex-wrap:wrap;gap:8px;padding:16px 20px}
+.tag{
+  font-family:var(--mono);font-size:12px;padding:4px 10px;
+  border:1px solid var(--border);color:var(--muted);
+}
+.tag.danger{border-color:var(--red);color:var(--red)}
+.tag.warn{border-color:var(--amber);color:var(--amber)}
+.tag.ok{border-color:var(--green);color:var(--green)}
+
+/* GUARDRAIL LIST */
+.guardrail-list{padding:12px 0}
+.guardrail-item{
+  padding:10px 20px;
+  display:flex;align-items:center;gap:12px;
+  border-bottom:1px solid var(--border);font-size:13px;
+}
+.guardrail-item:last-child{border-bottom:none}
+.guardrail-icon{font-family:var(--mono);font-size:12px;width:20px;text-align:center;flex-shrink:0}
+.guardrail-icon.present{color:var(--green)}
+.guardrail-icon.missing{color:var(--red)}
+.guardrail-name{flex:1}
+.guardrail-name.missing{color:var(--red)}
+.guardrail-note{font-size:12px;color:var(--faint)}
+
+/* FINDINGS */
+.finding-item{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:flex-start}
+.finding-item:last-child{border-bottom:none}
+.finding-item:hover{background:rgba(255,255,255,0.01)}
+.sev{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:0.5px;padding:3px 8px;border:1px solid;flex-shrink:0;margin-top:2px;white-space:nowrap}
+.sev.crit{color:var(--red);border-color:var(--red)}
+.sev.high{color:var(--red);border-color:rgba(255,51,102,0.5)}
+.sev.med{color:var(--amber);border-color:rgba(255,184,0,0.5)}
+.sev.low{color:var(--blue);border-color:rgba(68,136,255,0.5)}
+.finding-content h4{font-size:13px;font-weight:600;margin-bottom:4px}
+.finding-content p{font-size:12px;color:var(--muted)}
+.finding-content .ref{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:4px}
+
+/* COMPLIANCE MAP */
+.comp-map-item{
+  padding:12px 20px;border-bottom:1px solid var(--border);
+  display:flex;align-items:flex-start;gap:16px;font-size:13px;
+}
+.comp-map-item:last-child{border-bottom:none}
+.comp-framework{
+  font-family:var(--mono);font-size:11px;padding:3px 8px;
+  border:1px solid var(--border);color:var(--muted);
+  white-space:nowrap;flex-shrink:0;min-width:100px;text-align:center;
+}
+.comp-control{flex:1}
+.comp-control .ref{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px}
+.comp-control .desc{font-size:12px;color:var(--muted)}
+
+@media(max-width:1000px){.app{grid-template-columns:1fr}.sidebar{display:none}.two-col{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-logo"><div class="icon"></div> agent<span style="color:var(--green)">shield</span></div>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section">Overview</div>
+      <a href="../dashboard.html"><span class="icon">&#x25A0;</span> Dashboard</a>
+      <a href="#" class="active"><span class="icon">&#x25CB;</span> Agents</a>
+      <a href="#"><span class="icon">&#x25B2;</span> Findings</a>
+      <a href="#"><span class="icon">&#x25C6;</span> Reports</a>
+      <div class="sidebar-section">Compliance</div>
+      <a href="#"><span class="icon">&#x2610;</span> NIST AI RMF</a>
+      <a href="#"><span class="icon">&#x2610;</span> ISO 42001</a>
+      <a href="#"><span class="icon">&#x2610;</span> EU AI Act</a>
+      <a href="#"><span class="icon">&#x2610;</span> OWASP Agentic</a>
+      <div class="sidebar-section">Settings</div>
+      <a href="settings.html"><span class="icon">&#x2699;</span> Integrations</a>
+      <a href="settings.html"><span class="icon">&#x2691;</span> Team</a>
+      <a href="settings.html"><span class="icon">&#x2630;</span> API Keys</a>
+    </nav>
+    <div class="sidebar-footer">
+      <span class="org">Acme Corp</span>
+      Business Plan &middot; 37/100 agents
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <div class="breadcrumb">
+      <a href="../dashboard.html">Dashboard</a>
+      <span>/</span>
+      <a href="#">Agents</a>
+      <span>/</span>
+      CustomerSupportBot
+    </div>
+
+    <!-- AGENT HEADER -->
+    <div class="agent-header">
+      <div class="agent-title">
+        <h1>CustomerSupportBot</h1>
+        <div class="agent-meta">
+          <span class="meta-pill framework-pill">LangChain</span>
+          <span class="meta-pill">T4 AUTONOMOUS</span>
+          <span class="meta-pill" style="border-color:var(--red);color:var(--red)">EXEC PERMISSIONS</span>
+        </div>
+        <div class="filepath">
+          <code style="color:var(--muted)">Detected in:</code>
+          <code>./src/agents/customer_support/agent.py</code>
+        </div>
+        <div class="filepath" style="margin-top:2px">
+          <code style="color:var(--muted)">Last scanned:</code>
+          <code>2026-04-07 18:42 UTC</code>
+        </div>
+      </div>
+      <div class="risk-score-block">
+        <div class="risk-number">72</div>
+        <div class="risk-label">HIGH RISK</div>
+        <div class="risk-gauge"><div class="risk-fill"></div></div>
+      </div>
+    </div>
+
+    <!-- TOOL INVENTORY -->
+    <div class="section one-col">
+      <div class="panel">
+        <div class="panel-header">
+          <h3>Tool Inventory</h3>
+          <span class="count">8 tools &middot; 3 require human confirmation</span>
+        </div>
+        <table class="tool-table">
+          <thead>
+            <tr>
+              <th>Tool Name</th>
+              <th>Category</th>
+              <th>Confirmation Required</th>
+              <th>Risk</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="tool-name">subprocess_exec</td>
+              <td style="font-size:12px;color:var(--muted)">System</td>
+              <td><span class="confirm-badge no">NONE</span></td>
+              <td><span class="sev crit">CRIT</span></td>
+            </tr>
+            <tr>
+              <td class="tool-name">send_email</td>
+              <td style="font-size:12px;color:var(--muted)">Communication</td>
+              <td><span class="confirm-badge yes">REQUIRED</span></td>
+              <td><span class="sev high">HIGH</span></td>
+            </tr>
+            <tr>
+              <td class="tool-name">update_crm_record</td>
+              <td style="font-size:12px;color:var(--muted)">Database Write</td>
+              <td><span class="confirm-badge no">NONE</span></td>
+              <td><span class="sev high">HIGH</span></td>
+            </tr>
+            <tr>
+              <td class="tool-name">issue_refund</td>
+              <td style="font-size:12px;color:var(--muted)">Financial</td>
+              <td><span class="confirm-badge yes">REQUIRED</span></td>
+              <td><span class="sev high">HIGH</span></td>
+            </tr>
+            <tr>
+              <td class="tool-name">read_order_history</td>
+              <td style="font-size:12px;color:var(--muted)">Database Read</td>
+              <td><span class="confirm-badge na">N/A</span></td>
+              <td><span class="sev low">LOW</span></td>
+            </tr>
+            <tr>
+              <td class="tool-name">search_knowledge_base</td>
+              <td style="font-size:12px;color:var(--muted)">Retrieval</td>
+              <td><span class="confirm-badge na">N/A</span></td>
+              <td><span class="sev low">LOW</span></td>
+            </tr>
+            <tr>
+              <td class="tool-name">escalate_to_human</td>
+              <td style="font-size:12px;color:var(--muted)">Routing</td>
+              <td><span class="confirm-badge na">N/A</span></td>
+              <td><span class="sev low">LOW</span></td>
+            </tr>
+            <tr>
+              <td class="tool-name">log_interaction</td>
+              <td style="font-size:12px;color:var(--muted)">Observability</td>
+              <td><span class="confirm-badge na">N/A</span></td>
+              <td><span class="sev low">LOW</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SYSTEM PROMPT + PERMISSIONS -->
+    <div class="two-col">
+      <div>
+        <div class="section-title">System Prompt</div>
+        <div class="code-block"><!--
+--><span class="comment"># CustomerSupportBot v2.1</span>
+<span class="highlight">You are a customer support agent for Acme Corp.</span>
+<span class="highlight">Your primary goals are:</span>
+
+<span class="highlight">1. Resolve customer issues efficiently</span>
+<span class="highlight">2. Maintain a professional, empathetic tone</span>
+<span class="highlight">3. Escalate to humans only for billing disputes
+   over $500</span>
+
+<span class="comment"># Available actions</span>
+<span class="highlight">You may issue refunds up to $250 without
+approval. For amounts above $250, you MUST
+request confirmation.</span>
+
+<span class="comment"># System access</span>
+<span class="highlight">You have access to subprocess for running
+diagnostic scripts. Use sparingly.</span>
+<span class="comment"># WARNING: no allowlist defined</span>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-title">Permissions</div>
+        <div class="tag-list">
+          <span class="tag danger">subprocess.exec</span>
+          <span class="tag warn">email.send</span>
+          <span class="tag warn">crm.write</span>
+          <span class="tag warn">payments.refund</span>
+          <span class="tag ok">orders.read</span>
+          <span class="tag ok">knowledge.read</span>
+          <span class="tag ok">logs.write</span>
+        </div>
+
+        <div class="section-title" style="margin-top:24px">Data Access</div>
+        <div class="tag-list">
+          <span class="tag warn">PII — customer_name, email, phone</span>
+          <span class="tag warn">Financial — order history, refund amounts</span>
+          <span class="tag ok">Product catalog (read-only)</span>
+          <span class="tag ok">Support ticket history (read-only)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- GUARDRAILS -->
+    <div class="section one-col">
+      <div class="panel">
+        <div class="panel-header">
+          <h3>Guardrails Detected</h3>
+          <span class="count">3 present &middot; 4 missing</span>
+        </div>
+        <div class="guardrail-list">
+          <div class="guardrail-item">
+            <span class="guardrail-icon present">+</span>
+            <span class="guardrail-name">Human-in-the-loop gate (refunds &gt;$250)</span>
+            <span class="guardrail-note">Partial — does not cover subprocess calls</span>
+          </div>
+          <div class="guardrail-item">
+            <span class="guardrail-icon present">+</span>
+            <span class="guardrail-name">Output length limit (4,096 tokens)</span>
+            <span class="guardrail-note"></span>
+          </div>
+          <div class="guardrail-item">
+            <span class="guardrail-icon present">+</span>
+            <span class="guardrail-name">Escalation path to human agent</span>
+            <span class="guardrail-note"></span>
+          </div>
+          <div class="guardrail-item">
+            <span class="guardrail-icon missing">&#x2717;</span>
+            <span class="guardrail-name missing">Input validation / prompt injection protection</span>
+            <span class="guardrail-note" style="color:var(--red)">Required — OWASP A02</span>
+          </div>
+          <div class="guardrail-item">
+            <span class="guardrail-icon missing">&#x2717;</span>
+            <span class="guardrail-name missing">Subprocess tool allowlist</span>
+            <span class="guardrail-note" style="color:var(--red)">Critical — unrestricted shell access</span>
+          </div>
+          <div class="guardrail-item">
+            <span class="guardrail-icon missing">&#x2717;</span>
+            <span class="guardrail-name missing">Rate limiting on tool calls</span>
+            <span class="guardrail-note" style="color:var(--amber)">Recommended</span>
+          </div>
+          <div class="guardrail-item">
+            <span class="guardrail-icon missing">&#x2717;</span>
+            <span class="guardrail-name missing">Audit trail / decision logging</span>
+            <span class="guardrail-note" style="color:var(--amber)">EU AI Act Article 12</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FINDINGS + COMPLIANCE -->
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-header">
+          <h3>Findings</h3>
+          <span class="count">1 critical &middot; 2 high &middot; 1 medium</span>
+        </div>
+        <div class="finding-item">
+          <span class="sev crit">CRIT</span>
+          <div class="finding-content">
+            <h4>Unrestricted subprocess access</h4>
+            <p>Agent can execute arbitrary system commands without allowlisting. Full system blast radius.</p>
+            <div class="ref">NIST AI RMF: GOVERN 1.7 &middot; OWASP A01</div>
+          </div>
+        </div>
+        <div class="finding-item">
+          <span class="sev high">HIGH</span>
+          <div class="finding-content">
+            <h4>No input validation detected</h4>
+            <p>Customer messages are passed directly to the LLM without sanitization. Prompt injection risk.</p>
+            <div class="ref">OWASP Agentic A02 &middot; NIST MANAGE 2.2</div>
+          </div>
+        </div>
+        <div class="finding-item">
+          <span class="sev high">HIGH</span>
+          <div class="finding-content">
+            <h4>CRM write access without confirmation</h4>
+            <p>update_crm_record executes without any human review gate. PII data may be modified autonomously.</p>
+            <div class="ref">ISO 42001 A.8.4 &middot; NIST MANAGE 4.1</div>
+          </div>
+        </div>
+        <div class="finding-item">
+          <span class="sev med">MED</span>
+          <div class="finding-content">
+            <h4>Missing audit trail</h4>
+            <p>No structured logging for agent decisions, tool calls, or refund actions.</p>
+            <div class="ref">EU AI Act Article 12 &middot; ISO 42001 A.8.5</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <h3>Compliance Mapping</h3>
+          <span class="count">4 frameworks &middot; 8 controls</span>
+        </div>
+        <div class="comp-map-item">
+          <span class="comp-framework" style="border-color:var(--blue);color:var(--blue)">NIST AI RMF</span>
+          <div class="comp-control">
+            <div class="ref">GOVERN 1.7</div>
+            <div class="desc">Processes for AI risk decisions and governance are documented</div>
+          </div>
+        </div>
+        <div class="comp-map-item">
+          <span class="comp-framework" style="border-color:var(--blue);color:var(--blue)">NIST AI RMF</span>
+          <div class="comp-control">
+            <div class="ref">MANAGE 4.1</div>
+            <div class="desc">AI risk treatment options include risk avoidance and transfer</div>
+          </div>
+        </div>
+        <div class="comp-map-item">
+          <span class="comp-framework" style="border-color:var(--blue);color:var(--blue)">NIST AI RMF</span>
+          <div class="comp-control">
+            <div class="ref">MANAGE 2.2</div>
+            <div class="desc">AI risk measurement methods include human review</div>
+          </div>
+        </div>
+        <div class="comp-map-item">
+          <span class="comp-framework" style="border-color:var(--amber);color:var(--amber)">ISO 42001</span>
+          <div class="comp-control">
+            <div class="ref">A.8.4 — Access control</div>
+            <div class="desc">AI system actions restricted to authorized scope</div>
+          </div>
+        </div>
+        <div class="comp-map-item">
+          <span class="comp-framework" style="border-color:var(--amber);color:var(--amber)">ISO 42001</span>
+          <div class="comp-control">
+            <div class="ref">A.8.5 — Audit logging</div>
+            <div class="desc">AI decisions and actions must be logged and auditable</div>
+          </div>
+        </div>
+        <div class="comp-map-item">
+          <span class="comp-framework" style="border-color:var(--red);color:var(--red)">EU AI Act</span>
+          <div class="comp-control">
+            <div class="ref">Article 12 — Record-keeping</div>
+            <div class="desc">High-risk AI systems must maintain audit logs automatically</div>
+          </div>
+        </div>
+        <div class="comp-map-item">
+          <span class="comp-framework" style="border-color:var(--red);color:var(--red)">OWASP</span>
+          <div class="comp-control">
+            <div class="ref">A01 — Excessive Agency</div>
+            <div class="desc">Agent has more capabilities than required for its purpose</div>
+          </div>
+        </div>
+        <div class="comp-map-item">
+          <span class="comp-framework" style="border-color:var(--red);color:var(--red)">OWASP</span>
+          <div class="comp-control">
+            <div class="ref">A02 — Prompt Injection</div>
+            <div class="desc">Untrusted input can manipulate agent behavior</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+</body>
+</html>

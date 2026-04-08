@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login — Agent Shield</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0A0A0F;--surface:#13131A;--border:#252530;
+  --green:#00FF88;--amber:#FFB800;--red:#FF3366;
+  --text:#E8E8ED;--muted:#8888A0;--faint:#44445A;
+  --mono:'JetBrains Mono',monospace;--sans:'DM Sans',sans-serif;
+}
+body{
+  background:var(--bg);color:var(--text);font-family:var(--sans);
+  line-height:1.6;-webkit-font-smoothing:antialiased;
+  min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:40px 20px;
+}
+a{color:var(--green);text-decoration:none}
+a:hover{text-decoration:underline}
+
+.logo{
+  font-family:var(--mono);font-weight:700;font-size:20px;
+  display:flex;align-items:center;gap:10px;margin-bottom:48px;
+}
+.logo-icon{
+  width:18px;height:18px;border:2px solid var(--green);
+  transform:rotate(45deg);display:flex;align-items:center;justify-content:center;
+}
+.logo-icon::after{
+  content:'';width:6px;height:6px;background:var(--green);transform:rotate(-45deg);
+}
+
+.card{
+  width:100%;max-width:420px;
+  background:var(--surface);border:1px solid var(--border);
+  padding:40px;
+}
+
+.toggle{
+  display:flex;border:1px solid var(--border);margin-bottom:32px;
+}
+.toggle a{
+  flex:1;text-align:center;padding:10px;
+  font-size:14px;font-weight:500;color:var(--muted);
+}
+.toggle a.active{
+  background:var(--green);color:var(--bg);font-weight:600;
+}
+.toggle a:hover:not(.active){color:var(--text);text-decoration:none;background:rgba(255,255,255,0.03)}
+
+.github-btn{
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  width:100%;padding:12px;
+  border:1px solid var(--border);background:transparent;
+  color:var(--text);font-size:14px;font-weight:500;
+  font-family:var(--sans);cursor:pointer;
+  margin-bottom:24px;
+}
+.github-btn:hover{border-color:var(--muted);background:rgba(255,255,255,0.02)}
+.github-icon{
+  width:18px;height:18px;fill:var(--text);flex-shrink:0;
+}
+
+.divider{
+  display:flex;align-items:center;gap:12px;
+  font-size:12px;color:var(--faint);font-family:var(--mono);
+  margin-bottom:24px;
+}
+.divider::before,.divider::after{
+  content:'';flex:1;height:1px;background:var(--border);
+}
+
+.field{margin-bottom:20px}
+.field label{
+  display:block;font-size:12px;font-family:var(--mono);
+  letter-spacing:1px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:8px;
+}
+.field input{
+  width:100%;background:var(--bg);border:1px solid var(--border);
+  color:var(--text);font-size:14px;font-family:var(--sans);
+  padding:10px 14px;outline:none;
+}
+.field input:focus{border-color:var(--green)}
+.field input::placeholder{color:var(--faint)}
+
+.field-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.field-row label{margin-bottom:0}
+.field-row a{font-size:12px;color:var(--muted)}
+
+.submit-btn{
+  width:100%;padding:12px;
+  background:var(--green);color:var(--bg);
+  font-size:14px;font-weight:700;font-family:var(--sans);
+  border:none;cursor:pointer;margin-top:8px;
+}
+.submit-btn:hover{background:#00FFAA}
+
+.footer-note{
+  margin-top:24px;text-align:center;
+  font-size:13px;color:var(--muted);
+}
+
+.bottom-links{
+  margin-top:32px;text-align:center;
+  font-size:12px;color:var(--faint);
+}
+.bottom-links a{color:var(--faint)}
+.bottom-links a:hover{color:var(--muted)}
+</style>
+</head>
+<body>
+
+<div class="logo">
+  <div class="logo-icon"></div>
+  agent<span style="color:var(--green)">shield</span>
+</div>
+
+<div class="card">
+
+  <div class="toggle">
+    <a href="#" class="active">Log in</a>
+    <a href="#">Sign up</a>
+  </div>
+
+  <button class="github-btn">
+    <svg class="github-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577v-2.165c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0 1 12 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.63-5.37-12-12-12z"/>
+    </svg>
+    Continue with GitHub
+  </button>
+
+  <div class="divider">or continue with email</div>
+
+  <div class="field">
+    <label>Email</label>
+    <input type="email" placeholder="you@company.com" value="corey@acmecorp.io">
+  </div>
+
+  <div class="field">
+    <div class="field-row">
+      <label>Password</label>
+      <a href="#">Forgot password?</a>
+    </div>
+    <input type="password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" value="••••••••••••">
+  </div>
+
+  <button class="submit-btn">Log in</button>
+
+  <p class="footer-note">
+    Don't have an account? <a href="#">Sign up free</a>
+  </p>
+
+</div>
+
+<div class="bottom-links">
+  <a href="../index.html">Back to homepage</a>
+  &nbsp;&middot;&nbsp;
+  <a href="#">Privacy</a>
+  &nbsp;&middot;&nbsp;
+  <a href="#">Terms</a>
+</div>
+
+</body>
+</html>

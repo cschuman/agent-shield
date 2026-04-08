@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pricing — Agent Shield</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+--bg:#0A0A0F;--surface:#13131A;--surface-2:#1A1A25;--border:#252530;
+--green:#00FF88;--green-dim:#00CC6E;--amber:#FFB800;--red:#FF3366;--blue:#4488FF;
+--text:#E8E8ED;--muted:#8888A0;--faint:#44445A;
+--mono:'JetBrains Mono',monospace;--sans:'DM Sans',sans-serif;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:var(--green);text-decoration:none}a:hover{text-decoration:underline}
+body::before{content:'';position:fixed;top:0;left:0;width:100%;height:100%;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,136,0.008) 2px,rgba(0,255,136,0.008) 4px);pointer-events:none;z-index:9999}
+
+nav{position:fixed;top:0;width:100%;z-index:100;backdrop-filter:blur(16px);background:rgba(10,10,15,0.85);border-bottom:1px solid var(--border)}
+.nav-inner{max-width:1200px;margin:0 auto;padding:16px 32px;display:flex;justify-content:space-between;align-items:center}
+.logo{font-family:var(--mono);font-weight:700;font-size:18px;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px}
+.logo-icon{width:20px;height:20px;border:2px solid var(--green);transform:rotate(45deg);display:flex;align-items:center;justify-content:center}
+.logo-icon::after{content:'';width:8px;height:8px;background:var(--green);transform:rotate(-45deg)}
+.nav-links{display:flex;gap:32px;align-items:center}
+.nav-links a{color:var(--muted);font-size:14px;font-weight:500;transition:color 0.2s}
+.nav-links a:hover{color:var(--text);text-decoration:none}
+.nav-links a.active{color:var(--green)}
+.nav-cta{background:var(--green);color:var(--bg);padding:8px 20px;font-weight:600;font-size:13px;font-family:var(--mono);letter-spacing:0.5px;border:none;cursor:pointer}
+.nav-cta:hover{background:#00FFAA;text-decoration:none;color:var(--bg)}
+
+/* HEADER */
+.page-header{padding:140px 32px 60px;text-align:center;max-width:800px;margin:0 auto}
+.page-header h1{font-size:44px;font-weight:700;letter-spacing:-2px;margin-bottom:16px}
+.page-header p{color:var(--muted);font-size:18px}
+.pricing-model{font-family:var(--mono);font-size:13px;color:var(--green);border:1px solid rgba(0,255,136,0.3);padding:8px 20px;display:inline-block;margin-top:20px}
+
+/* PRICING GRID */
+.pricing-grid{max-width:1200px;margin:0 auto;padding:40px 32px 100px;display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border)}
+.price-card{background:var(--bg);padding:40px 28px;display:flex;flex-direction:column;position:relative;transition:background 0.2s}
+.price-card:hover{background:var(--surface)}
+.price-card.featured{background:var(--surface);border-top:2px solid var(--green)}
+.price-card.featured::before{content:'MOST POPULAR';position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--green);color:var(--bg);font-family:var(--mono);font-size:10px;font-weight:700;padding:4px 12px;letter-spacing:1px}
+.tier-name{font-family:var(--mono);font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:20px}
+.price{margin-bottom:8px}
+.price .amount{font-size:40px;font-weight:700;letter-spacing:-2px}
+.price .currency{font-size:18px;color:var(--muted);vertical-align:top;position:relative;top:8px}
+.price .period{font-size:14px;color:var(--muted)}
+.price-note{font-size:13px;color:var(--muted);margin-bottom:24px;min-height:40px}
+.price-cta{display:block;text-align:center;padding:14px;font-weight:600;font-size:14px;font-family:var(--sans);border:1px solid var(--border);color:var(--text);margin-bottom:32px;transition:all 0.15s;background:transparent;cursor:pointer}
+.price-cta:hover{border-color:var(--green);color:var(--green);text-decoration:none}
+.price-card.featured .price-cta{background:var(--green);color:var(--bg);border-color:var(--green)}
+.price-card.featured .price-cta:hover{background:#00FFAA}
+.feature-list{list-style:none;flex:1}
+.feature-list li{padding:8px 0;font-size:13px;color:var(--muted);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.feature-list li:last-child{border-bottom:none}
+.feature-list .check{color:var(--green);font-family:var(--mono);font-size:14px;flex-shrink:0}
+.feature-list .dash{color:var(--faint);font-family:var(--mono);font-size:14px;flex-shrink:0}
+.feature-list .highlight{color:var(--text);font-weight:500}
+
+/* COMPARISON TABLE */
+.comparison{max-width:1200px;margin:0 auto;padding:0 32px 100px}
+.section-label{font-family:var(--mono);font-size:12px;color:var(--green);letter-spacing:2px;text-transform:uppercase;margin-bottom:16px}
+.section-title{font-size:32px;font-weight:700;letter-spacing:-1px;margin-bottom:48px}
+.comp-table{width:100%;border-collapse:collapse}
+.comp-table th{text-align:left;padding:12px 16px;font-family:var(--mono);font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)}
+.comp-table td{padding:12px 16px;font-size:14px;border-bottom:1px solid var(--border)}
+.comp-table tr:hover td{background:var(--surface)}
+.comp-table td.feature-name{color:var(--text);font-weight:500}
+.comp-table .yes{color:var(--green);font-family:var(--mono);font-weight:600}
+.comp-table .no{color:var(--faint);font-family:var(--mono)}
+.comp-table .value{color:var(--text);font-family:var(--mono);font-size:13px}
+
+/* FAQ */
+.faq{max-width:800px;margin:0 auto;padding:0 32px 120px}
+.faq-item{border-bottom:1px solid var(--border);padding:24px 0}
+.faq-item h3{font-size:16px;font-weight:600;margin-bottom:12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+.faq-item h3::after{content:'+';font-family:var(--mono);color:var(--muted);font-size:20px}
+.faq-item p{color:var(--muted);font-size:14px;line-height:1.7}
+
+footer{border-top:1px solid var(--border);padding:40px 32px;max-width:1200px;margin:0 auto}
+.footer-inner{display:flex;justify-content:space-between;align-items:center}
+.footer-inner p{color:var(--muted);font-size:13px}
+.footer-links{display:flex;gap:24px}
+.footer-links a{color:var(--muted);font-size:13px}
+
+@media(max-width:900px){.pricing-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.pricing-grid{grid-template-columns:1fr}.page-header h1{font-size:28px}}
+</style>
+</head>
+<body>
+
+<nav>
+<div class="nav-inner">
+<a href="index.html" class="logo"><div class="logo-icon"></div> agent<span style="color:var(--green)">shield</span></a>
+<div class="nav-links">
+<a href="index.html#features">Features</a>
+<a href="index.html#frameworks">Frameworks</a>
+<a href="pricing.html" class="active">Pricing</a>
+<a href="dashboard.html">Dashboard</a>
+<a href="https://github.com/cschuman/agent-shield" class="nav-cta">GITHUB</a>
+</div>
+</div>
+</nav>
+
+<section class="page-header">
+<h1>Transparent pricing.<br>Per-agent, per-month.</h1>
+<p>Start with the free CLI. Upgrade when your security team asks "how do we govern all our AI agents?"</p>
+<div class="pricing-model">BILLED PER AGENT MONITORED / MONTH</div>
+</section>
+
+<section class="pricing-grid">
+<div class="price-card">
+<div class="tier-name">CLI</div>
+<div class="price"><span class="currency">$</span><span class="amount">0</span> <span class="period">forever</span></div>
+<div class="price-note">Open source. Unlimited scans. No account needed.</div>
+<a href="https://github.com/cschuman/agent-shield" class="price-cta">Install CLI</a>
+<ul class="feature-list">
+<li><span class="check">+</span> <span class="highlight">Unlimited local scans</span></li>
+<li><span class="check">+</span> 10 framework detection</li>
+<li><span class="check">+</span> Terminal risk report</li>
+<li><span class="check">+</span> JSON export</li>
+<li><span class="check">+</span> NIST AI RMF mapping</li>
+<li><span class="dash">&ndash;</span> Dashboard</li>
+<li><span class="dash">&ndash;</span> Continuous monitoring</li>
+<li><span class="dash">&ndash;</span> PDF reports</li>
+<li><span class="dash">&ndash;</span> Team features</li>
+</ul>
+</div>
+
+<div class="price-card">
+<div class="tier-name">Team</div>
+<div class="price"><span class="currency">$</span><span class="amount">1,500</span> <span class="period">/mo</span></div>
+<div class="price-note">Up to 25 agents. $60/agent/mo overage.</div>
+<a href="#" class="price-cta">Start Team Trial</a>
+<ul class="feature-list">
+<li><span class="check">+</span> <span class="highlight">Everything in CLI</span></li>
+<li><span class="check">+</span> <span class="highlight">Web dashboard</span></li>
+<li><span class="check">+</span> Up to 25 agents</li>
+<li><span class="check">+</span> Monthly risk reports (PDF)</li>
+<li><span class="check">+</span> NIST + ISO 42001 mapping</li>
+<li><span class="check">+</span> Email alerts on new agents</li>
+<li><span class="check">+</span> Historical trend tracking</li>
+<li><span class="dash">&ndash;</span> Continuous monitoring</li>
+<li><span class="dash">&ndash;</span> CI/CD integration</li>
+</ul>
+</div>
+
+<div class="price-card featured">
+<div class="tier-name">Business</div>
+<div class="price"><span class="currency">$</span><span class="amount">5,000</span> <span class="period">/mo</span></div>
+<div class="price-note">Up to 100 agents. $50/agent/mo overage.</div>
+<a href="#" class="price-cta">Start Business Trial</a>
+<ul class="feature-list">
+<li><span class="check">+</span> <span class="highlight">Everything in Team</span></li>
+<li><span class="check">+</span> <span class="highlight">Continuous monitoring</span></li>
+<li><span class="check">+</span> Up to 100 agents</li>
+<li><span class="check">+</span> Weekly risk reports</li>
+<li><span class="check">+</span> EU AI Act mapping</li>
+<li><span class="check">+</span> OWASP Agentic Top 10</li>
+<li><span class="check">+</span> CI/CD pipeline integration</li>
+<li><span class="check">+</span> Auditor-ready export</li>
+<li><span class="check">+</span> Priority email support</li>
+</ul>
+</div>
+
+<div class="price-card">
+<div class="tier-name">Enterprise</div>
+<div class="price"><span class="currency">$</span><span class="amount">15,000</span> <span class="period">/mo</span></div>
+<div class="price-note">Unlimited agents. Custom compliance frameworks.</div>
+<a href="#" class="price-cta">Contact Sales</a>
+<ul class="feature-list">
+<li><span class="check">+</span> <span class="highlight">Everything in Business</span></li>
+<li><span class="check">+</span> <span class="highlight">Unlimited agents</span></li>
+<li><span class="check">+</span> SSO / SAML</li>
+<li><span class="check">+</span> Custom compliance frameworks</li>
+<li><span class="check">+</span> Real-time risk reports</li>
+<li><span class="check">+</span> API access</li>
+<li><span class="check">+</span> Insurance data export</li>
+<li><span class="check">+</span> Dedicated CSM</li>
+<li><span class="check">+</span> On-premise deployment</li>
+</ul>
+</div>
+</section>
+
+<section class="comparison">
+<div class="section-label">Comparison</div>
+<h2 class="section-title">Full feature comparison</h2>
+<table class="comp-table">
+<thead>
+<tr><th>Feature</th><th>CLI</th><th>Team</th><th>Business</th><th>Enterprise</th></tr>
+</thead>
+<tbody>
+<tr><td class="feature-name">Agent discovery</td><td class="yes">+</td><td class="yes">+</td><td class="yes">+</td><td class="yes">+</td></tr>
+<tr><td class="feature-name">Risk scoring (0-100)</td><td class="yes">+</td><td class="yes">+</td><td class="yes">+</td><td class="yes">+</td></tr>
+<tr><td class="feature-name">Frameworks supported</td><td class="value">10</td><td class="value">10</td><td class="value">10</td><td class="value">10 + custom</td></tr>
+<tr><td class="feature-name">Agents monitored</td><td class="value">Unlimited (local)</td><td class="value">25</td><td class="value">100</td><td class="value">Unlimited</td></tr>
+<tr><td class="feature-name">Web dashboard</td><td class="no">&ndash;</td><td class="yes">+</td><td class="yes">+</td><td class="yes">+</td></tr>
+<tr><td class="feature-name">Continuous monitoring</td><td class="no">&ndash;</td><td class="no">&ndash;</td><td class="yes">+</td><td class="yes">+</td></tr>
+<tr><td class="feature-name">PDF risk reports</td><td class="no">&ndash;</td><td class="value">Monthly</td><td class="value">Weekly</td><td class="value">Real-time</td></tr>
+<tr><td class="feature-name">NIST AI RMF</td><td class="yes">+</td><td class="yes">+</td><td class="yes">+</td><td class="yes">+</td></tr>
+<tr><td class="feature-name">ISO/IEC 42001</td><td class="no">&ndash;</td><td class="yes">+</td><td class="yes">+</td><td class="yes">+</td></tr>
+<tr><td class="feature-name">EU AI Act</td><td class="no">&ndash;</td><td class="no">&ndash;</td><td class="yes">+</td><td class="yes">+</td></tr>
+<tr><td class="feature-name">OWASP Agentic Top 10</td><td class="no">&ndash;</td><td class="no">&ndash;</td><td class="yes">+</td><td class="yes">+</td></tr>
+<tr><td class="feature-name">CI/CD integration</td><td class="no">&ndash;</td><td class="no">&ndash;</td><td class="yes">+</td><td class="yes">+</td></tr>
+<tr><td class="feature-name">Auditor-ready export</td><td class="no">&ndash;</td><td class="no">&ndash;</td><td class="yes">+</td><td class="yes">+</td></tr>
+<tr><td class="feature-name">SSO / SAML</td><td class="no">&ndash;</td><td class="no">&ndash;</td><td class="no">&ndash;</td><td class="yes">+</td></tr>
+<tr><td class="feature-name">Insurance data API</td><td class="no">&ndash;</td><td class="no">&ndash;</td><td class="no">&ndash;</td><td class="yes">+</td></tr>
+<tr><td class="feature-name">Support</td><td class="value">Community</td><td class="value">Email</td><td class="value">Priority</td><td class="value">Dedicated CSM</td></tr>
+</tbody>
+</table>
+</section>
+
+<section class="faq">
+<div class="section-label">FAQ</div>
+<h2 class="section-title">Common questions</h2>
+
+<div class="faq-item">
+<h3>Why not just use Snyk agent-scan?</h3>
+<p>Snyk agent-scan is a runtime security scanner &mdash; it detects vulnerabilities in agent code. Agent Shield is an audit and compliance tool &mdash; it discovers agents, scores their risk posture, maps findings to compliance frameworks (NIST, ISO 42001, EU AI Act), and generates board-ready reports. They're complementary, not competitive. Think of Snyk as your firewall and Agent Shield as your auditor.</p>
+</div>
+
+<div class="faq-item">
+<h3>What agent frameworks do you support?</h3>
+<p>LangChain, LangGraph, CrewAI, AutoGen (Microsoft), OpenAI Assistants, Anthropic MCP, Anthropic Agent SDK, AWS Bedrock Agents, Vercel AI SDK, and custom agents with standard patterns (system prompts, tool calls, agent loops). We add new frameworks regularly based on community requests.</p>
+</div>
+
+<div class="faq-item">
+<h3>How is pricing calculated?</h3>
+<p>You're charged per unique AI agent monitored per month. An "agent" is a distinct AI system with its own tools, permissions, and system prompt. A single codebase might have 3 agents or 300 &mdash; you only pay for what's there. The CLI is always free for local scans.</p>
+</div>
+
+<div class="faq-item">
+<h3>We need to prepare for EU AI Act. Can Agent Shield help?</h3>
+<p>Yes. Business and Enterprise tiers map every finding to EU AI Act articles (Article 9 Risk Management, Article 10 Data Governance, Article 12 Record-keeping, Article 14 Human Oversight). The auditor-ready export gives your compliance team exactly what they need to demonstrate conformity for high-risk AI systems. High-risk obligations take effect August 2026.</p>
+</div>
+
+<div class="faq-item">
+<h3>Is the CLI really free forever?</h3>
+<p>Yes. Agent Shield CLI is open source under the MIT license. No account required. No usage limits. No phone-home telemetry. The paid tiers add a web dashboard, continuous monitoring, team collaboration, compliance framework mapping beyond NIST, and auditor-ready reporting. The CLI is the foundation &mdash; it will never be paywalled.</p>
+</div>
+
+<div class="faq-item">
+<h3>How does the insurance data API work?</h3>
+<p>Enterprise customers can export structured risk assessment data via API for use in AI insurance underwriting. As the AI insurance market develops (projected $4.7B-$500B by 2030), this data becomes the actuarial foundation that insurers need to price AI liability policies. Early customers build the dataset that makes AI insurance possible.</p>
+</div>
+</section>
+
+<footer>
+<div class="footer-inner">
+<p>&copy; 2026 Agent Shield. Open source under MIT License.</p>
+<div class="footer-links">
+<a href="https://github.com/cschuman/agent-shield">GitHub</a>
+<a href="index.html">Home</a>
+<a href="dashboard.html">Dashboard</a>
+</div>
+</div>
+</footer>
+
+</body>
+</html>

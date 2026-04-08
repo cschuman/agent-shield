@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Go-To-Market Plan — Agent Shield</title>
+<meta name="description" content="Agent Shield GTM strategy: open source distribution, bottom-up sales, and a path to $200K MRR.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+--bg:#0A0A0F;--surface:#13131A;--surface-2:#1A1A25;--border:#252530;
+--green:#00FF88;--green-dim:#00CC6E;--amber:#FFB800;--red:#FF3366;--blue:#4488FF;
+--text:#E8E8ED;--muted:#8888A0;--faint:#44445A;
+--mono:'JetBrains Mono',monospace;--sans:'DM Sans',sans-serif;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:var(--green);text-decoration:none}
+a:hover{text-decoration:underline}
+
+body::before{
+content:'';position:fixed;top:0;left:0;width:100%;height:100%;
+background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,136,0.008) 2px,rgba(0,255,136,0.008) 4px);
+pointer-events:none;z-index:9999;
+}
+
+/* NAV */
+nav{position:fixed;top:0;width:100%;z-index:100;backdrop-filter:blur(16px);background:rgba(10,10,15,0.85);border-bottom:1px solid var(--border)}
+.nav-inner{max-width:1200px;margin:0 auto;padding:16px 32px;display:flex;justify-content:space-between;align-items:center}
+.logo{font-family:var(--mono);font-weight:700;font-size:18px;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px}
+.logo-icon{width:20px;height:20px;border:2px solid var(--green);transform:rotate(45deg);display:flex;align-items:center;justify-content:center}
+.logo-icon::after{content:'';width:8px;height:8px;background:var(--green);transform:rotate(-45deg)}
+.nav-links{display:flex;gap:32px;align-items:center}
+.nav-links a{color:var(--muted);font-size:14px;font-weight:500;transition:color 0.2s}
+.nav-links a:hover{color:var(--text);text-decoration:none}
+.nav-links a.active{color:var(--green)}
+.nav-cta{background:var(--green);color:var(--bg) !important;padding:8px 20px;font-weight:600;font-size:13px;font-family:var(--mono);letter-spacing:0.5px;border:none;cursor:pointer;transition:all 0.15s}
+.nav-cta:hover{background:#00FFAA;text-decoration:none}
+
+/* PAGE HEADER */
+.page-header{padding:140px 32px 60px;text-align:center;max-width:900px;margin:0 auto}
+.page-header .label{font-family:var(--mono);font-size:12px;color:var(--green);letter-spacing:2px;text-transform:uppercase;margin-bottom:20px}
+.page-header h1{font-size:48px;font-weight:700;letter-spacing:-2px;margin-bottom:20px;line-height:1.1}
+.page-header .sub{color:var(--muted);font-size:18px;line-height:1.7;max-width:680px;margin:0 auto 28px}
+.page-header .tagline-badge{font-family:var(--mono);font-size:14px;color:var(--green);border:1px solid rgba(0,255,136,0.35);padding:10px 24px;display:inline-block;letter-spacing:0.5px}
+
+/* LAYOUT */
+.content{max-width:1100px;margin:0 auto;padding:0 32px 120px}
+.section{margin-bottom:100px}
+.section-label{font-family:var(--mono);font-size:11px;color:var(--green);letter-spacing:2px;text-transform:uppercase;margin-bottom:14px}
+.section-number{font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:1px;margin-bottom:6px}
+.section-title{font-size:30px;font-weight:700;letter-spacing:-1px;margin-bottom:8px}
+.section-desc{color:var(--muted);font-size:15px;margin-bottom:36px;max-width:680px;line-height:1.7}
+
+/* POSITIONING */
+.positioning-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);margin-bottom:32px}
+.pos-card{background:var(--bg);padding:32px 28px;transition:background 0.2s}
+.pos-card:hover{background:var(--surface)}
+.pos-card .pos-label{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px}
+.pos-card h3{font-size:16px;font-weight:600;margin-bottom:8px}
+.pos-card p{font-size:14px;color:var(--muted);line-height:1.6}
+.pos-card.highlight h3{color:var(--green)}
+.pos-card.danger h3{color:var(--red)}
+
+.not-list{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--red);padding:24px 28px}
+.not-list .not-label{font-family:var(--mono);font-size:11px;color:var(--red);letter-spacing:1px;text-transform:uppercase;margin-bottom:14px}
+.not-list ul{list-style:none;display:flex;flex-wrap:wrap;gap:12px}
+.not-list ul li{font-family:var(--mono);font-size:13px;color:var(--muted);border:1px solid var(--faint);padding:6px 14px}
+.not-list ul li::before{content:'not ';color:var(--red)}
+
+/* FLYWHEEL */
+.flywheel{background:var(--surface);border:1px solid var(--border);padding:40px;margin-bottom:32px;position:relative;overflow:hidden}
+.flywheel::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse at 20% 50%,rgba(0,255,136,0.03),transparent 60%);pointer-events:none}
+.flywheel-label{font-family:var(--mono);font-size:11px;color:var(--green);letter-spacing:2px;text-transform:uppercase;margin-bottom:28px}
+.flywheel-steps{display:flex;flex-direction:column;gap:0}
+.flywheel-step{display:flex;align-items:flex-start;gap:20px;padding:16px 0;border-bottom:1px solid var(--border);position:relative}
+.flywheel-step:last-child{border-bottom:none}
+.step-num{font-family:var(--mono);font-size:11px;color:var(--green);width:24px;flex-shrink:0;padding-top:3px}
+.step-content h4{font-size:15px;font-weight:600;margin-bottom:4px}
+.step-content p{font-size:13px;color:var(--muted);line-height:1.6}
+.step-arrow{font-family:var(--mono);color:var(--faint);font-size:11px;margin-left:auto;padding-top:3px;flex-shrink:0}
+
+/* CHANNELS */
+.channels{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);margin-bottom:24px}
+.channel-card{background:var(--bg);padding:28px 24px;transition:background 0.2s}
+.channel-card:hover{background:var(--surface)}
+.channel-rank{font-family:var(--mono);font-size:28px;font-weight:700;color:var(--faint);margin-bottom:12px;line-height:1}
+.channel-card h4{font-size:15px;font-weight:600;margin-bottom:8px}
+.channel-meta{display:flex;gap:8px;margin-bottom:10px}
+.pill{font-family:var(--mono);font-size:10px;padding:3px 8px;border:1px solid;letter-spacing:0.5px}
+.pill.green{color:var(--green);border-color:rgba(0,255,136,0.4)}
+.pill.amber{color:var(--amber);border-color:rgba(255,184,0,0.4)}
+.pill.red{color:var(--red);border-color:rgba(255,51,102,0.4)}
+.pill.blue{color:var(--blue);border-color:rgba(68,136,255,0.4)}
+.pill.muted{color:var(--muted);border-color:var(--faint)}
+.channel-card p{font-size:13px;color:var(--muted);line-height:1.6}
+
+/* CUSTOMERS TABLE */
+.customers-table{width:100%;border-collapse:collapse;margin-bottom:12px}
+.customers-table th{text-align:left;padding:12px 16px;font-family:var(--mono);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:2px solid var(--border)}
+.customers-table td{padding:14px 16px;font-size:13px;border-bottom:1px solid var(--border);vertical-align:top}
+.customers-table tr:hover td{background:var(--surface)}
+.customers-table .num{font-family:var(--mono);color:var(--green);font-weight:700;font-size:14px;width:52px}
+.customers-table .who{color:var(--text);font-weight:500;line-height:1.5}
+.customers-table .how{color:var(--muted);line-height:1.5}
+.customers-table .msg{color:var(--muted);font-style:italic;line-height:1.5}
+.customers-table .ask{font-family:var(--mono);font-size:11px;color:var(--green);line-height:1.5}
+.customers-table tr.group-break td{padding-top:20px}
+
+/* TIMELINE */
+.timeline{display:flex;flex-direction:column;gap:0}
+.timeline-row{display:grid;grid-template-columns:160px 1fr;gap:32px;padding:20px 0;border-bottom:1px solid var(--border);align-items:center}
+.timeline-row:last-child{border-bottom:none}
+.timeline-week{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.timeline-week .wnum{color:var(--green);font-weight:700;font-size:13px}
+.timeline-milestone{font-size:14px;color:var(--text);line-height:1.5}
+.timeline-milestone .highlight{color:var(--green);font-weight:600}
+.timeline-milestone .muted{color:var(--muted)}
+.timeline-row.is-month .timeline-week .wnum{color:var(--amber)}
+.timeline-row.is-month .timeline-milestone .highlight{color:var(--amber)}
+
+/* MRR projections inline */
+.mrr-inline{font-family:var(--mono);font-size:12px;color:var(--amber);margin-left:8px}
+
+/* SALES MOTION */
+.sales-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);margin-bottom:32px}
+.sales-card{background:var(--bg);padding:32px 24px;display:flex;flex-direction:column;gap:12px;transition:background 0.2s}
+.sales-card:hover{background:var(--surface)}
+.sales-tier{font-family:var(--mono);font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
+.sales-price{font-size:28px;font-weight:700;letter-spacing:-1px}
+.sales-price span{font-size:14px;color:var(--muted);font-weight:400}
+.sales-motion-tag{font-family:var(--mono);font-size:10px;padding:3px 10px;border:1px solid;display:inline-block;width:fit-content}
+.sales-motion-tag.self{color:var(--green);border-color:rgba(0,255,136,0.4)}
+.sales-motion-tag.light{color:var(--amber);border-color:rgba(255,184,0,0.4)}
+.sales-motion-tag.assisted{color:var(--blue);border-color:rgba(68,136,255,0.4)}
+.sales-card p{font-size:13px;color:var(--muted);line-height:1.6}
+.sales-card.featured{background:var(--surface);border-top:2px solid var(--green)}
+
+.insight-box{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--green);padding:28px 32px}
+.insight-box .insight-label{font-family:var(--mono);font-size:11px;color:var(--green);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px}
+.insight-box p{font-size:15px;line-height:1.7;color:var(--text)}
+.insight-box p strong{color:var(--green)}
+.insight-box .compare{display:flex;gap:40px;margin-top:20px}
+.compare-item .compare-label{font-family:var(--mono);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.compare-item .compare-val{font-size:14px;color:var(--text)}
+.compare-item .compare-val .yes{color:var(--green)}
+.compare-item .compare-val .no{color:var(--red)}
+
+/* CONTENT STRATEGY */
+.content-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);margin-bottom:32px}
+.content-card{background:var(--bg);padding:32px 24px;transition:background 0.2s}
+.content-card:hover{background:var(--surface)}
+.content-card .content-icon{font-family:var(--mono);font-size:24px;color:var(--green);margin-bottom:16px;line-height:1}
+.content-card h4{font-size:15px;font-weight:600;margin-bottom:8px}
+.content-card p{font-size:13px;color:var(--muted);line-height:1.6}
+
+.no-go-box{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--amber);padding:24px 28px}
+.no-go-box .no-go-label{font-family:var(--mono);font-size:11px;color:var(--amber);letter-spacing:1px;text-transform:uppercase;margin-bottom:14px}
+.no-go-box ul{list-style:none;display:flex;flex-wrap:wrap;gap:10px}
+.no-go-box ul li{font-family:var(--mono);font-size:12px;color:var(--muted);border:1px solid var(--faint);padding:5px 12px}
+.no-go-box ul li::before{content:'x  ';color:var(--amber)}
+
+/* METRICS TABLE */
+.metrics-table{width:100%;border-collapse:collapse;margin-bottom:12px}
+.metrics-table th{text-align:left;padding:12px 16px;font-family:var(--mono);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border-bottom:2px solid var(--border)}
+.metrics-table th:first-child{color:var(--muted)}
+.metrics-table td{padding:14px 16px;font-size:13px;border-bottom:1px solid var(--border)}
+.metrics-table tr:hover td{background:var(--surface)}
+.metrics-table .metric-name{color:var(--text);font-weight:500}
+.metrics-table .m1{color:var(--muted);font-family:var(--mono);font-size:12px}
+.metrics-table .m3{color:var(--text);font-family:var(--mono);font-size:12px}
+.metrics-table .m6{color:var(--amber);font-family:var(--mono);font-size:12px;font-weight:600}
+.metrics-table .m12{color:var(--green);font-family:var(--mono);font-size:12px;font-weight:700}
+
+/* FOOTER */
+footer{border-top:1px solid var(--border);padding:40px 32px;max-width:1200px;margin:0 auto}
+.footer-inner{display:flex;justify-content:space-between;align-items:center}
+.footer-inner p{color:var(--muted);font-size:13px}
+.footer-links{display:flex;gap:24px}
+.footer-links a{color:var(--muted);font-size:13px}
+
+/* RESPONSIVE */
+@media(max-width:900px){
+.positioning-grid{grid-template-columns:1fr}
+.channels{grid-template-columns:1fr}
+.sales-grid{grid-template-columns:1fr 1fr}
+.content-cards{grid-template-columns:1fr}
+.insight-box .compare{flex-direction:column;gap:20px}
+.timeline-row{grid-template-columns:100px 1fr;gap:16px}
+.page-header h1{font-size:34px}
+}
+@media(max-width:640px){
+.nav-links a:not(.nav-cta){display:none}
+.page-header{padding:120px 20px 40px}
+.content{padding:0 20px 80px}
+.page-header h1{font-size:28px}
+.sales-grid{grid-template-columns:1fr}
+.customers-table .how,.customers-table .msg{display:none}
+}
+
+/* ANIMATIONS */
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.page-header{animation:fadeUp 0.5s ease-out}
+</style>
+</head>
+<body>
+
+<nav>
+<div class="nav-inner">
+  <a href="../index.html" class="logo" style="color:inherit">
+    <div class="logo-icon"></div>
+    agent<span style="color:var(--green)">shield</span>
+  </a>
+  <div class="nav-links">
+    <a href="../index.html#features">Features</a>
+    <a href="../pricing.html">Pricing</a>
+    <a href="../dashboard.html">Dashboard</a>
+    <a href="gtm-plan.html" class="active">GTM Plan</a>
+    <a href="https://github.com/cschuman/agent-shield" class="nav-cta">GITHUB</a>
+  </div>
+</div>
+</nav>
+
+<div class="page-header">
+  <div class="label">Internal Document &middot; Go-To-Market Strategy</div>
+  <h1>The Agent Shield<br>GTM Plan</h1>
+  <p class="sub">Open source distribution, bottom-up sales, and a path from first GitHub star to $200K MRR. No marketing team required.</p>
+  <div class="tagline-badge">"Know what your AI agents can do before they do it."</div>
+</div>
+
+<div class="content">
+
+  <!-- ===== SECTION 1: POSITIONING ===== -->
+  <div class="section" id="positioning">
+    <div class="section-number">01</div>
+    <div class="section-label">Category &amp; Positioning</div>
+    <h2 class="section-title">What Agent Shield is — and is not.</h2>
+    <p class="section-desc">Positioning is not about what you do. It is about the category you own in the buyer's mind and the alternatives you replace.</p>
+
+    <div class="positioning-grid">
+      <div class="pos-card highlight">
+        <div class="pos-label">Category</div>
+        <h3>AI Agent Governance / AI Risk Infrastructure</h3>
+        <p>The emerging category where security teams need answers before AI agents cause incidents. Agent Shield is the tooling layer that makes this tractable.</p>
+      </div>
+      <div class="pos-card highlight">
+        <div class="pos-label">Competitive Frame</div>
+        <h3>"The Vanta for AI agents"</h3>
+        <p>Self-serve, transparent pricing, developer-friendly. Compliance tooling that doesn't require a six-month enterprise sales cycle to evaluate.</p>
+      </div>
+      <div class="pos-card">
+        <div class="pos-label">Primary Tagline</div>
+        <h3>"Know what your AI agents can do before they do it."</h3>
+        <p>Addresses the core anxiety: agents are deployed and nobody knows their actual permissions, blast radius, or guardrail coverage.</p>
+      </div>
+      <div class="pos-card">
+        <div class="pos-label">Proof Point</div>
+        <h3>Like <code style="color:var(--green);font-size:13px">npm audit</code>, but for autonomous AI.</h3>
+        <p>Every developer knows npm audit. Zero explanation needed. Instant comprehension of the value proposition for the target buyer.</p>
+      </div>
+    </div>
+
+    <div class="not-list">
+      <div class="not-label">Not positioning as</div>
+      <ul>
+        <li>AI firewall</li>
+        <li>AI security scanner</li>
+        <li>copilot</li>
+        <li>general AI governance platform</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ===== SECTION 2: DISTRIBUTION ===== -->
+  <div class="section" id="distribution">
+    <div class="section-number">02</div>
+    <div class="section-label">Distribution Strategy</div>
+    <h2 class="section-title">Open source first. No marketing team needed.</h2>
+    <p class="section-desc">The Rust CLI is the primary distribution channel. Every install is a potential enterprise conversation. The flywheel runs without a sales team.</p>
+
+    <div class="flywheel">
+      <div class="flywheel-label">The Distribution Flywheel</div>
+      <div class="flywheel-steps">
+        <div class="flywheel-step">
+          <div class="step-num">01</div>
+          <div class="step-content">
+            <h4>Developer Discovery</h4>
+            <p>Developer finds CLI via HN front page, GitHub trending, a blog post, or a conference talk. Installs in 30 seconds: <code style="color:var(--green);font-size:12px">cargo install agent-shield</code></p>
+          </div>
+          <div class="step-arrow">&#8594;</div>
+        </div>
+        <div class="flywheel-step">
+          <div class="step-num">02</div>
+          <div class="step-content">
+            <h4>Immediate Value</h4>
+            <p>Developer scans their codebase, gets a risk report in under 30 seconds. Finds agents they didn't know existed. Shares the output in Slack.</p>
+          </div>
+          <div class="step-arrow">&#8594;</div>
+        </div>
+        <div class="flywheel-step">
+          <div class="step-num">03</div>
+          <div class="step-content">
+            <h4>Internal Spread</h4>
+            <p>Risk report circulates. Security team, engineering manager, or CISO sees the output and asks: "Can we run this on all our repos?"</p>
+          </div>
+          <div class="step-arrow">&#8594;</div>
+        </div>
+        <div class="flywheel-step">
+          <div class="step-num">04</div>
+          <div class="step-content">
+            <h4>Team or Business Signup</h4>
+            <p>Security team self-serves into Team ($1,500/mo) or Business ($5,000/mo). No sales call required. Credit card in the UI.</p>
+          </div>
+          <div class="step-arrow">&#8594;</div>
+        </div>
+        <div class="flywheel-step">
+          <div class="step-num">05</div>
+          <div class="step-content">
+            <h4>Compliance Expansion</h4>
+            <p>Compliance team engages for regulatory framework mapping (EU AI Act, ISO 42001). Enterprise tier at $15,000/mo with documentation and audit support.</p>
+          </div>
+          <div class="step-arrow">&#8592;</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="channels">
+      <div class="channel-card">
+        <div class="channel-rank">01</div>
+        <h4>GitHub + Hacker News</h4>
+        <div class="channel-meta">
+          <span class="pill green">zero cost</span>
+          <span class="pill green">high impact</span>
+        </div>
+        <p>A strong "Show HN" post with a compelling README and demo GIF is the single highest-ROI launch activity. One front page moment can drive 500+ installs in 48 hours.</p>
+      </div>
+      <div class="channel-card">
+        <div class="channel-rank">02</div>
+        <h4>Dev Blog Posts</h4>
+        <div class="channel-meta">
+          <span class="pill green">low effort</span>
+          <span class="pill amber">medium impact</span>
+        </div>
+        <p>"I scanned our AI agents and found X" format. Data-driven, not opinion. Each post feeds Google search, HN, and Twitter. Written in batches of three.</p>
+      </div>
+      <div class="channel-card">
+        <div class="channel-rank">03</div>
+        <h4>Conference Talks</h4>
+        <div class="channel-meta">
+          <span class="pill amber">medium effort</span>
+          <span class="pill green">high credibility</span>
+        </div>
+        <p>RSA, BSides, DevSecOps Days. One talk per quarter. Positions the builder as a practitioner, not a vendor. Each talk generates leads for months afterward.</p>
+      </div>
+      <div class="channel-card">
+        <div class="channel-rank">04</div>
+        <h4>Podcast Appearances</h4>
+        <div class="channel-meta">
+          <span class="pill green">low effort</span>
+          <span class="pill amber">medium reach</span>
+        </div>
+        <p>Security and compliance podcasts (Risky Business, CISO Series, Darknet Diaries ecosystem). Async format fits ADHD-friendly creation style.</p>
+      </div>
+      <div class="channel-card">
+        <div class="channel-rank">05</div>
+        <h4>Community</h4>
+        <div class="channel-meta">
+          <span class="pill muted">low effort</span>
+          <span class="pill muted">long-term</span>
+        </div>
+        <p>Discord or Slack for agent-shield users. Support channel, feedback loop, and word-of-mouth amplifier. Becomes more valuable over time as membership grows.</p>
+      </div>
+      <div class="channel-card">
+        <div class="channel-rank">06</div>
+        <h4>r/netsec + DevSecOps Slack</h4>
+        <div class="channel-meta">
+          <span class="pill green">zero cost</span>
+          <span class="pill amber">targeted</span>
+        </div>
+        <p>High-signal communities where the exact target buyer (security engineers, DevSecOps practitioners) spends time. Authentic participation, not spam.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SECTION 3: FIRST 10 CUSTOMERS ===== -->
+  <div class="section" id="customers">
+    <div class="section-number">03</div>
+    <div class="section-label">First 10 Customers</div>
+    <h2 class="section-title">Specific targets. Specific messages. Specific asks.</h2>
+    <p class="section-desc">Each customer segment has a different entry point, a different message, and a different ask. Generic outreach does not work. This does.</p>
+
+    <table class="customers-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Who</th>
+          <th>How to Reach</th>
+          <th>Message</th>
+          <th>Ask</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="num">1 &ndash; 3</td>
+          <td class="who">SOC 2 companies deploying LangChain agents</td>
+          <td class="how">r/netsec, HN "Show HN" post, DevSecOps Slack</td>
+          <td class="msg">"Your SOC 2 auditor is going to ask about AI agent governance. Here's your answer."</td>
+          <td class="ask">Free scan<br>&darr; Team trial</td>
+        </tr>
+        <tr>
+          <td class="num">4 &ndash; 6</td>
+          <td class="who">CISO network (Amazon alumni)</td>
+          <td class="how">Former Amazon colleagues now CISOs or security leads at startups</td>
+          <td class="msg">"I built a tool that answers the question your board is about to ask about AI risk."</td>
+          <td class="ask">Demo call<br>&darr; Business trial</td>
+        </tr>
+        <tr>
+          <td class="num">7 &ndash; 8</td>
+          <td class="who">EU-regulated companies</td>
+          <td class="how">LinkedIn outreach via partner, GDPR / AI Act conferences</td>
+          <td class="msg">"EU AI Act high-risk obligations hit Aug 2026. This gives you audit-ready documentation today."</td>
+          <td class="ask">Enterprise pilot</td>
+        </tr>
+        <tr>
+          <td class="num">9 &ndash; 10</td>
+          <td class="who">AI agent platform companies</td>
+          <td class="how">Direct outreach to LangChain, CrewAI ecosystem partners</td>
+          <td class="msg">"Embed agent-shield in your docs as the recommended governance tool."</td>
+          <td class="ask">Partnership<br>+ co-marketing</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ===== SECTION 4: TIMELINE ===== -->
+  <div class="section" id="timeline">
+    <div class="section-number">04</div>
+    <div class="section-label">Launch Timeline</div>
+    <h2 class="section-title">12 months from open source to $200K MRR.</h2>
+    <p class="section-desc">Week-by-week milestones for the first two months, then quarterly targets. Revenue numbers are specific, not aspirational ranges.</p>
+
+    <div class="timeline">
+      <div class="timeline-row">
+        <div class="timeline-week"><div class="wnum">Week 1</div></div>
+        <div class="timeline-milestone"><span class="highlight">CLI on GitHub.</span> README with demo GIF, copy-paste install command, example scan output. <span class="muted">Submit "Show HN" post the same day.</span></div>
+      </div>
+      <div class="timeline-row">
+        <div class="timeline-week"><div class="wnum">Week 2</div></div>
+        <div class="timeline-milestone"><span class="highlight">Blog post: "I scanned 50 AI agents and here's what I found."</span> <span class="muted">Data from real scans. Link back to CLI. Submit to r/netsec and DevSecOps Slack.</span></div>
+      </div>
+      <div class="timeline-row">
+        <div class="timeline-week"><div class="wnum">Week 3 &ndash; 4</div></div>
+        <div class="timeline-milestone"><span class="highlight">Dashboard MVP.</span> Auth, dashboard view, billing integration. <span class="muted">Team tier goes live. Self-serve credit card signup.</span></div>
+      </div>
+      <div class="timeline-row">
+        <div class="timeline-week"><div class="wnum">Week 5 &ndash; 6</div></div>
+        <div class="timeline-milestone"><span class="highlight">First 3 design partners.</span> Free Team tier in exchange for structured feedback sessions. <span class="muted">Document what they actually need vs. what was built.</span></div>
+      </div>
+      <div class="timeline-row">
+        <div class="timeline-week"><div class="wnum">Week 7 &ndash; 8</div></div>
+        <div class="timeline-milestone"><span class="highlight">First paying customer.</span> <span class="muted">Target: one Team or Business customer converting from the design partner group or cold inbound.</span></div>
+      </div>
+      <div class="timeline-row is-month">
+        <div class="timeline-week"><div class="wnum">Month 3</div></div>
+        <div class="timeline-milestone"><span class="highlight">10 paying customers.</span><span class="mrr-inline">$15K MRR</span> <span class="muted">GitHub: 2,000 stars. CLI installs: 1,000. Free-to-paid conversion: 1%.</span></div>
+      </div>
+      <div class="timeline-row is-month">
+        <div class="timeline-week"><div class="wnum">Month 6</div></div>
+        <div class="timeline-milestone"><span class="highlight">30 paying customers.</span><span class="mrr-inline">$50K MRR</span> <span class="muted">GitHub: 5,000 stars. CLI installs: 3,000. First Enterprise deal closed.</span></div>
+      </div>
+      <div class="timeline-row is-month">
+        <div class="timeline-week"><div class="wnum">Month 12</div></div>
+        <div class="timeline-milestone"><span class="highlight">85 paying customers.</span><span class="mrr-inline">$200K MRR</span> <span class="muted">GitHub: 15,000 stars. CLI installs: 10,000. Free-to-paid conversion: 2%.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SECTION 5: SALES MOTION ===== -->
+  <div class="section" id="sales">
+    <div class="section-number">05</div>
+    <div class="section-label">Sales Motion</div>
+    <h2 class="section-title">Bottom-up, not top-down.</h2>
+    <p class="section-desc">The developer adopts first. The security team buys second. This is the Datadog/Snyk playbook, not the IBM/Palo Alto playbook. No six-month procurement cycles.</p>
+
+    <div class="sales-grid">
+      <div class="sales-card">
+        <div class="sales-tier">Free CLI</div>
+        <div class="sales-price">$0 <span>/ forever</span></div>
+        <div class="sales-motion-tag self">Self-serve</div>
+        <p>No sales. No signup. Just <code style="color:var(--green);font-size:12px">cargo install</code>. The entire value of the free tier is distribution, not conversion. It seeds the funnel.</p>
+      </div>
+      <div class="sales-card featured">
+        <div class="sales-tier">Team</div>
+        <div class="sales-price">$1,500 <span>/ mo</span></div>
+        <div class="sales-motion-tag self">Self-serve</div>
+        <p>Credit card signup. Automated onboarding. No sales call required. Target buyer is the engineering manager or security lead who saw the CLI output internally.</p>
+      </div>
+      <div class="sales-card">
+        <div class="sales-tier">Business</div>
+        <div class="sales-price">$5,000 <span>/ mo</span></div>
+        <div class="sales-motion-tag light">Light touch</div>
+        <p>Self-serve or 1&ndash;2 discovery calls. Target buyer is the CISO or security director. Deal cycle is days to two weeks, not months.</p>
+      </div>
+      <div class="sales-card">
+        <div class="sales-tier">Enterprise</div>
+        <div class="sales-price">$15,000 <span>/ mo</span></div>
+        <div class="sales-motion-tag assisted">Sales-assisted</div>
+        <p>2&ndash;4 week deal cycle with a defined process. Not 6 months. Target buyer has regulatory obligations (EU AI Act, ISO 42001). Procurement is not the entry point.</p>
+      </div>
+    </div>
+
+    <div class="insight-box">
+      <div class="insight-label">Key Insight: The Playbook Matters</div>
+      <p>Agent Shield's sales motion is <strong>bottom-up</strong> (developer adopts &rarr; security buys), not top-down (CISO evaluates &rarr; procurement approves). The difference is measured in months of deal cycle time and tens of thousands in CAC.</p>
+      <div class="compare">
+        <div class="compare-item">
+          <div class="compare-label">Agent Shield (target)</div>
+          <div class="compare-val">
+            <span class="yes">&#x2714;</span> Datadog model<br>
+            <span class="yes">&#x2714;</span> Snyk model<br>
+            <span class="yes">&#x2714;</span> Developer-led growth
+          </div>
+        </div>
+        <div class="compare-item">
+          <div class="compare-label">Not this playbook</div>
+          <div class="compare-val">
+            <span class="no">&#x2718;</span> IBM model<br>
+            <span class="no">&#x2718;</span> Palo Alto model<br>
+            <span class="no">&#x2718;</span> 6-month procurement
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SECTION 6: CONTENT STRATEGY ===== -->
+  <div class="section" id="content">
+    <div class="section-number">06</div>
+    <div class="section-label">Content Strategy</div>
+    <h2 class="section-title">ADHD-compatible. Batch-friendly. No content calendar.</h2>
+    <p class="section-desc">Sustained daily marketing is not the plan. Sprint, batch, ship, rest. The GitHub README is the primary marketing asset. Everything else amplifies it.</p>
+
+    <div class="content-cards">
+      <div class="content-card">
+        <div class="content-icon">&#x1F4DD;</div>
+        <h4>Batch Blog Posts</h4>
+        <p>Write 3 posts in one focused sprint. Schedule for weekly release. Each post follows the "I scanned X and found Y" format — data-driven, specific, shareable. No opinion pieces.</p>
+      </div>
+      <div class="content-card">
+        <div class="content-icon">&#x2139;&#xFE0F;</div>
+        <h4>GitHub README First</h4>
+        <p>The README is the homepage, the sales deck, and the technical documentation simultaneously. It is maintained obsessively. Everything links to it. It never goes stale.</p>
+      </div>
+      <div class="content-card">
+        <div class="content-icon">&#x1F3A4;</div>
+        <h4>Conference Talks</h4>
+        <p>One talk per quarter: RSA, BSides, DevSecOps Days. A good conference talk generates inbound for 12 months. Prepare once, benefit for a year.</p>
+      </div>
+    </div>
+
+    <div class="no-go-box">
+      <div class="no-go-label">Explicitly not doing</div>
+      <ul>
+        <li>newsletter</li>
+        <li>content calendar</li>
+        <li>daily social media</li>
+        <li>LinkedIn thought leadership posts</li>
+        <li>weekly YouTube videos</li>
+        <li>cold email sequences</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ===== SECTION 7: METRICS ===== -->
+  <div class="section" id="metrics">
+    <div class="section-number">07</div>
+    <div class="section-label">Metrics That Matter</div>
+    <h2 class="section-title">Five numbers. One dashboard. No vanity metrics.</h2>
+    <p class="section-desc">If it is not on this list, it is not a metric worth tracking in year one. GitHub stars are a proxy for distribution health, not ego.</p>
+
+    <table class="metrics-table">
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th>Month 1</th>
+          <th>Month 3</th>
+          <th>Month 6</th>
+          <th>Month 12</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="metric-name">GitHub Stars</td>
+          <td class="m1">500</td>
+          <td class="m3">2,000</td>
+          <td class="m6">5,000</td>
+          <td class="m12">15,000</td>
+        </tr>
+        <tr>
+          <td class="metric-name">CLI Installs</td>
+          <td class="m1">200</td>
+          <td class="m3">1,000</td>
+          <td class="m6">3,000</td>
+          <td class="m12">10,000</td>
+        </tr>
+        <tr>
+          <td class="metric-name">Paid Customers</td>
+          <td class="m1">0</td>
+          <td class="m3">3</td>
+          <td class="m6">15</td>
+          <td class="m12">85</td>
+        </tr>
+        <tr>
+          <td class="metric-name">MRR</td>
+          <td class="m1">$0</td>
+          <td class="m3">$5K</td>
+          <td class="m6">$25K</td>
+          <td class="m12">$200K</td>
+        </tr>
+        <tr>
+          <td class="metric-name">Free &rarr; Paid Conversion</td>
+          <td class="m1" style="color:var(--faint)">N/A</td>
+          <td class="m3">1%</td>
+          <td class="m6">1.5%</td>
+          <td class="m12">2%</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div><!-- /content -->
+
+<footer>
+  <div class="footer-inner">
+    <p>&copy; 2026 Agent Shield. Open source under MIT License.</p>
+    <div class="footer-links">
+      <a href="../index.html">Home</a>
+      <a href="../pricing.html">Pricing</a>
+      <a href="https://github.com/cschuman/agent-shield">GitHub</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

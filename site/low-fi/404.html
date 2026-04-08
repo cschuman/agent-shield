@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>404 — Agent Not Found — Agent Shield</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0A0A0F;--surface:#13131A;--border:#252530;
+  --green:#00FF88;--amber:#FFB800;--red:#FF3366;
+  --text:#E8E8ED;--muted:#8888A0;--faint:#44445A;
+  --mono:'JetBrains Mono',monospace;--sans:'DM Sans',sans-serif;
+}
+body{
+  background:var(--bg);color:var(--text);font-family:var(--sans);
+  line-height:1.6;-webkit-font-smoothing:antialiased;
+  min-height:100vh;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:40px 20px;
+  text-align:center;
+}
+a{color:var(--green);text-decoration:none}
+a:hover{text-decoration:underline}
+
+.logo{
+  font-family:var(--mono);font-weight:700;font-size:16px;
+  display:flex;align-items:center;gap:8px;
+  position:fixed;top:24px;left:32px;
+}
+.logo-icon{
+  width:14px;height:14px;border:2px solid var(--green);
+  transform:rotate(45deg);display:flex;align-items:center;justify-content:center;
+}
+.logo-icon::after{
+  content:'';width:5px;height:5px;background:var(--green);transform:rotate(-45deg);
+}
+
+.error-code{
+  font-family:var(--mono);font-size:96px;font-weight:700;
+  color:var(--surface);
+  letter-spacing:-4px;
+  margin-bottom:8px;
+  position:relative;
+  user-select:none;
+}
+.error-code::after{
+  content:'404';
+  position:absolute;top:0;left:0;right:0;
+  color:transparent;
+  -webkit-text-stroke:1px var(--border);
+}
+
+.error-headline{
+  font-size:28px;font-weight:700;letter-spacing:-0.5px;
+  margin-bottom:16px;
+}
+
+.error-body{
+  font-size:16px;color:var(--muted);
+  max-width:420px;margin-bottom:12px;
+}
+
+.error-humor{
+  font-family:var(--mono);font-size:13px;color:var(--faint);
+  border:1px solid var(--border);padding:8px 16px;
+  display:inline-block;margin-bottom:40px;
+}
+
+.actions{display:flex;gap:12px;align-items:center;justify-content:center}
+
+.back-btn{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:10px 24px;
+  background:var(--green);color:var(--bg);
+  font-size:14px;font-weight:700;font-family:var(--sans);
+  border:none;cursor:pointer;
+}
+.back-btn:hover{background:#00FFAA;text-decoration:none;color:var(--bg)}
+
+.secondary-link{
+  font-size:14px;color:var(--muted);
+  border:1px solid var(--border);
+  padding:10px 24px;
+}
+.secondary-link:hover{border-color:var(--muted);color:var(--text);text-decoration:none}
+
+/* DECORATIVE TERMINAL EXCERPT */
+.terminal-snip{
+  background:var(--surface);border:1px solid var(--border);
+  font-family:var(--mono);font-size:12px;
+  padding:20px 24px;text-align:left;
+  max-width:480px;margin-bottom:48px;
+  line-height:1.8;color:var(--muted);
+}
+.terminal-snip .g{color:var(--green)}
+.terminal-snip .r{color:var(--red)}
+.terminal-snip .d{color:var(--faint)}
+</style>
+</head>
+<body>
+
+<a href="../index.html" class="logo">
+  <div class="logo-icon"></div>
+  agent<span style="color:var(--green)">shield</span>
+</a>
+
+<div class="error-code">404</div>
+
+<h1 class="error-headline">Agent not found.</h1>
+
+<p class="error-body">
+  The agent you're looking for may have been removed, renamed, or never existed.
+</p>
+
+<div class="error-humor">
+  Maybe it had good guardrails.
+</div>
+
+<div class="terminal-snip">
+  <span class="d">$</span> <span class="g">agent-shield</span> lookup UnknownAgent<br>
+  <br>
+  <span class="r">ERROR</span> Agent "UnknownAgent" not found in inventory<br>
+  <span class="d">Hint: run `agent-shield scan ./` to refresh the inventory</span><br>
+  <span class="d">Last full scan: 4 minutes ago &middot; 37 agents indexed</span>
+</div>
+
+<div class="actions">
+  <a href="../dashboard.html" class="back-btn">&larr; Back to Dashboard</a>
+  <a href="#" class="secondary-link">View all agents</a>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vision — Agent Shield</title>
+<meta name="description" content="The Agent Shield vision document: why AI agent governance is the defining compliance challenge of 2026, and how we're building the infrastructure to solve it.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+--bg:#0A0A0F;--surface:#13131A;--surface-2:#1A1A25;--border:#252530;
+--green:#00FF88;--green-dim:#00CC6E;--amber:#FFB800;--red:#FF3366;--blue:#4488FF;
+--text:#E8E8ED;--muted:#8888A0;--faint:#44445A;
+--mono:'JetBrains Mono',monospace;--sans:'DM Sans',sans-serif;
+--max-prose:740px;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.7;-webkit-font-smoothing:antialiased}
+a{color:var(--green);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* Scanline overlay */
+body::before{
+content:'';position:fixed;top:0;left:0;width:100%;height:100%;
+background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,136,0.008) 2px,rgba(0,255,136,0.008) 4px);
+pointer-events:none;z-index:9999;
+}
+
+/* NAV */
+nav{position:fixed;top:0;width:100%;z-index:100;backdrop-filter:blur(16px);background:rgba(10,10,15,0.85);border-bottom:1px solid var(--border)}
+.nav-inner{max-width:1200px;margin:0 auto;padding:16px 32px;display:flex;justify-content:space-between;align-items:center}
+.logo{font-family:var(--mono);font-weight:700;font-size:18px;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px;color:var(--text)}
+.logo:hover{text-decoration:none}
+.logo-icon{width:20px;height:20px;border:2px solid var(--green);transform:rotate(45deg);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.logo-icon::after{content:'';width:8px;height:8px;background:var(--green);transform:rotate(-45deg)}
+.nav-links{display:flex;gap:32px;align-items:center}
+.nav-links a{color:var(--muted);font-size:14px;font-weight:500;transition:color 0.2s}
+.nav-links a:hover{color:var(--text);text-decoration:none}
+.nav-links a.active{color:var(--green)}
+.nav-cta{background:var(--green);color:var(--bg)!important;padding:8px 20px;font-weight:600;font-size:13px;font-family:var(--mono);letter-spacing:0.5px;border:none;cursor:pointer;transition:all 0.15s}
+.nav-cta:hover{background:#00FFAA;text-decoration:none}
+
+/* PAGE SHELL */
+.page-wrap{max-width:1100px;margin:0 auto;padding:120px 32px 100px;display:grid;grid-template-columns:220px 1fr;gap:60px;align-items:start}
+
+/* SIDEBAR TOC */
+.toc{position:sticky;top:96px}
+.toc-label{font-family:var(--mono);font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--faint);margin-bottom:16px}
+.toc ul{list-style:none}
+.toc ul li{margin-bottom:2px}
+.toc ul li a{font-size:13px;color:var(--muted);display:block;padding:6px 12px;border-left:2px solid var(--border);transition:all 0.15s;line-height:1.4}
+.toc ul li a:hover{color:var(--text);border-left-color:var(--green);text-decoration:none}
+.toc ul li a.active{color:var(--green);border-left-color:var(--green)}
+.toc-meta{margin-top:24px;padding-top:20px;border-top:1px solid var(--border)}
+.toc-meta p{font-size:12px;color:var(--faint);line-height:1.6}
+.toc-meta .mono{font-family:var(--mono);color:var(--muted)}
+
+/* CONTENT */
+.doc-content{}
+
+/* HEADER */
+.doc-header{margin-bottom:64px}
+.doc-eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--green);margin-bottom:20px;display:flex;align-items:center;gap:12px}
+.doc-eyebrow::after{content:'';flex:1;height:1px;background:rgba(0,255,136,0.2);max-width:120px}
+.doc-header h1{font-size:48px;font-weight:700;letter-spacing:-2px;line-height:1.05;margin-bottom:20px}
+.doc-header h1 em{color:var(--green);font-style:normal}
+.doc-header .lead{font-size:19px;color:var(--muted);line-height:1.7;max-width:var(--max-prose);margin-bottom:32px}
+.doc-meta{display:flex;gap:32px;flex-wrap:wrap}
+.doc-meta-item{font-family:var(--mono);font-size:12px;color:var(--faint)}
+.doc-meta-item span{color:var(--muted)}
+
+/* SECTIONS */
+.doc-section{margin-bottom:80px;scroll-margin-top:100px}
+.section-number{font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:1px;margin-bottom:8px}
+.doc-section h2{font-size:28px;font-weight:700;letter-spacing:-0.8px;margin-bottom:6px;display:flex;align-items:baseline;gap:16px}
+.doc-section h2 .anchor{font-size:14px;color:var(--faint);font-weight:400;opacity:0;transition:opacity 0.2s}
+.doc-section h2:hover .anchor{opacity:1}
+.section-rule{height:1px;background:var(--border);margin-bottom:32px;position:relative}
+.section-rule::before{content:'';position:absolute;left:0;top:0;height:1px;width:60px;background:var(--green)}
+
+/* PROSE */
+.prose{max-width:var(--max-prose)}
+.prose p{margin-bottom:20px;color:var(--muted);font-size:16px;line-height:1.75}
+.prose p strong{color:var(--text);font-weight:600}
+.prose h3{font-size:17px;font-weight:600;color:var(--text);margin:36px 0 12px;letter-spacing:-0.3px}
+.prose ul{list-style:none;margin-bottom:20px}
+.prose ul li{padding:6px 0 6px 20px;font-size:15px;color:var(--muted);position:relative;border-bottom:1px solid var(--border)}
+.prose ul li:last-child{border-bottom:none}
+.prose ul li::before{content:'—';position:absolute;left:0;color:var(--faint);font-family:var(--mono)}
+
+/* STAT BLOCKS */
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);margin:32px 0}
+.stat-cell{background:var(--bg);padding:28px 24px;transition:background 0.2s}
+.stat-cell:hover{background:var(--surface)}
+.stat-value{font-family:var(--mono);font-size:32px;font-weight:700;line-height:1;margin-bottom:8px}
+.stat-value.green{color:var(--green)}.stat-value.amber{color:var(--amber)}.stat-value.red{color:var(--red)}
+.stat-label{font-size:13px;color:var(--muted);line-height:1.4}
+.stat-source{font-size:11px;color:var(--faint);font-family:var(--mono);margin-top:6px}
+
+/* CALLOUT BOXES */
+.callout{border:1px solid var(--border);padding:24px 28px;margin:28px 0;position:relative;background:var(--surface)}
+.callout.warn{border-color:rgba(255,184,0,0.4);background:rgba(255,184,0,0.04)}
+.callout.danger{border-color:rgba(255,51,102,0.4);background:rgba(255,51,102,0.04)}
+.callout.info{border-color:rgba(0,255,136,0.25);background:rgba(0,255,136,0.03)}
+.callout-label{font-family:var(--mono);font-size:10px;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;font-weight:700}
+.callout.warn .callout-label{color:var(--amber)}
+.callout.danger .callout-label{color:var(--red)}
+.callout.info .callout-label{color:var(--green)}
+.callout p{font-size:14px;color:var(--muted);margin:0;line-height:1.65}
+.callout p strong{color:var(--text)}
+
+/* COMPARISON TABLE */
+.comp-table{width:100%;border-collapse:collapse;margin:28px 0;font-size:13px}
+.comp-table th{font-family:var(--mono);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--faint);text-align:left;padding:10px 16px;border-bottom:1px solid var(--border)}
+.comp-table td{padding:14px 16px;border-bottom:1px solid var(--border);color:var(--muted);vertical-align:top}
+.comp-table tr:last-child td{border-bottom:none}
+.comp-table tr:hover td{background:var(--surface)}
+.comp-table .co{color:var(--text);font-weight:500}
+.comp-table .tag{font-family:var(--mono);font-size:10px;padding:3px 8px;border:1px solid;letter-spacing:0.5px;white-space:nowrap;display:inline-block}
+.comp-table .tag.acq{color:var(--amber);border-color:var(--amber)}
+.comp-table .tag.ent{color:var(--red);border-color:var(--red)}
+.comp-table .tag.oss{color:var(--green);border-color:var(--green)}
+.comp-table .tag.free{color:var(--blue);border-color:var(--blue)}
+.comp-table .tag.us{color:var(--muted);border-color:var(--border)}
+
+/* MOAT TIMELINE */
+.moat-list{list-style:none;margin:28px 0;padding:0}
+.moat-list li{display:grid;grid-template-columns:120px 1fr;gap:20px;padding:16px 0;border-bottom:1px solid var(--border);align-items:baseline}
+.moat-list li:last-child{border-bottom:none}
+.moat-year{font-family:var(--mono);font-size:13px;color:var(--green)}
+.moat-desc{font-size:14px;color:var(--muted)}
+.moat-desc strong{color:var(--text);display:block;font-size:15px;margin-bottom:4px}
+
+/* PRICING SUMMARY */
+.tier-list{list-style:none;margin:28px 0}
+.tier-list li{display:grid;grid-template-columns:140px 120px 1fr;gap:20px;padding:16px 0;border-bottom:1px solid var(--border);align-items:center}
+.tier-list li:last-child{border-bottom:none}
+.tier-name-col{font-family:var(--mono);font-size:13px;color:var(--text)}
+.tier-price-col{font-size:15px;font-weight:600;color:var(--green);font-family:var(--mono)}
+.tier-note-col{font-size:13px;color:var(--muted)}
+
+/* MARKET FUNNEL */
+.market-funnel{margin:32px 0}
+.funnel-row{display:flex;align-items:center;margin-bottom:10px;gap:16px}
+.funnel-label{font-size:13px;color:var(--muted);width:200px;flex-shrink:0;text-align:right}
+.funnel-bar-wrap{flex:1;background:var(--surface);height:40px;position:relative;border:1px solid var(--border)}
+.funnel-bar{height:100%;display:flex;align-items:center;padding-left:16px;font-family:var(--mono);font-size:13px;font-weight:600;transition:width 0.3s}
+.funnel-bar.tam{background:rgba(0,255,136,0.12);border-right:2px solid var(--green);color:var(--green);width:100%}
+.funnel-bar.sam{background:rgba(255,184,0,0.1);border-right:2px solid var(--amber);color:var(--amber);width:62%}
+.funnel-bar.som{background:rgba(255,51,102,0.1);border-right:2px solid var(--red);color:var(--red);width:18%}
+
+/* FOOTER */
+footer{border-top:1px solid var(--border);padding:40px 32px;max-width:1100px;margin:0 auto}
+.footer-inner{display:flex;justify-content:space-between;align-items:center}
+.footer-inner p{color:var(--muted);font-size:13px}
+.footer-links{display:flex;gap:24px}
+.footer-links a{color:var(--muted);font-size:13px}
+.footer-links a:hover{color:var(--text)}
+
+/* RESPONSIVE */
+@media(max-width:900px){
+.page-wrap{grid-template-columns:1fr;padding:100px 20px 80px;gap:40px}
+.toc{display:none}
+.doc-header h1{font-size:34px}
+.stat-grid{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:600px){
+.stat-grid{grid-template-columns:1fr}
+.doc-meta{gap:16px}
+.comp-table{font-size:12px}
+.tier-list li{grid-template-columns:1fr 1fr;gap:8px}
+.tier-note-col{grid-column:1/-1;font-size:12px}
+.nav-links a:not(.nav-cta){display:none}
+.doc-header h1{font-size:26px}
+}
+
+/* FADE-IN ANIMATION */
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.doc-header{animation:fadeUp 0.5s ease-out}
+</style>
+</head>
+<body>
+
+<nav>
+<div class="nav-inner">
+<a href="../index.html" class="logo"><div class="logo-icon"></div> agent<span style="color:var(--green)">shield</span></a>
+<div class="nav-links">
+<a href="../index.html#features">Features</a>
+<a href="../pricing.html">Pricing</a>
+<a href="../dashboard.html">Dashboard</a>
+<a href="vision.html" class="active">Vision</a>
+<a href="https://github.com/cschuman/agent-shield" class="nav-cta">GITHUB</a>
+</div>
+</div>
+</nav>
+
+<div class="page-wrap">
+
+<!-- SIDEBAR TOC -->
+<aside class="toc">
+<div class="toc-label">Contents</div>
+<ul>
+<li><a href="#problem">1. Problem Statement</a></li>
+<li><a href="#solution">2. The Solution</a></li>
+<li><a href="#market">3. Market Opportunity</a></li>
+<li><a href="#business">4. Business Model</a></li>
+<li><a href="#competitive">5. Competitive Landscape</a></li>
+<li><a href="#why-now">6. Why Now</a></li>
+<li><a href="#team">7. Team &amp; Moat</a></li>
+</ul>
+<div class="toc-meta">
+<p class="mono">v1.2 &mdash; April 2026</p>
+<p>Internal strategy document.<br>Not for distribution.</p>
+</div>
+</aside>
+
+<!-- MAIN CONTENT -->
+<main class="doc-content">
+
+<header class="doc-header">
+<div class="doc-eyebrow">Vision Document</div>
+<h1>The <em>npm audit</em><br>for AI Agents.</h1>
+<p class="lead">AI agents are being deployed faster than governance tools can track them. Agent Shield is the infrastructure layer that makes AI auditable — starting with a free CLI and growing into the compliance data platform that the insurance industry needs.</p>
+<div class="doc-meta">
+<div class="doc-meta-item">Status: <span>Active</span></div>
+<div class="doc-meta-item">Version: <span>1.2</span></div>
+<div class="doc-meta-item">Updated: <span>April 7, 2026</span></div>
+<div class="doc-meta-item">License: <span>MIT (CLI) / Commercial (Platform)</span></div>
+</div>
+</header>
+
+<!-- 1. PROBLEM -->
+<section class="doc-section" id="problem">
+<div class="section-number">01</div>
+<h2>Problem Statement <a href="#problem" class="anchor">#</a></h2>
+<div class="section-rule"></div>
+<div class="prose">
+
+<p>Organizations are deploying AI agents at a pace that has outrun every governance practice they have. An AI agent is not a chatbot you can watch; it is an autonomous process that calls external APIs, reads and writes to databases, sends emails, executes code, and makes decisions — often with no human in the loop and no audit trail.</p>
+
+<p>The result is a governance blindspot that is rapidly becoming a legal and financial liability.</p>
+
+<div class="stat-grid">
+<div class="stat-cell">
+<div class="stat-value red">64%</div>
+<div class="stat-label">of organizations lack full visibility into AI-related risks in their environment</div>
+<div class="stat-source">IBM Institute for Business Value, 2025</div>
+</div>
+<div class="stat-cell">
+<div class="stat-value red">79%</div>
+<div class="stat-label">have blindspots where AI agents invoke tools and APIs with no observation or logging</div>
+<div class="stat-source">Gartner AI Governance Survey, 2025</div>
+</div>
+<div class="stat-cell">
+<div class="stat-value amber">38%</div>
+<div class="stat-label">monitor AI agent traffic end-to-end across their full stack</div>
+<div class="stat-source">McKinsey State of AI, 2025</div>
+</div>
+</div>
+
+<h3>The Legal Exposure Is Real and Growing</h3>
+<p>AI-related litigation is no longer theoretical. <strong>AI lawsuits grew 978% between 2021 and 2025</strong>, covering copyright infringement, discriminatory outputs, privacy violations, and autonomous agent decisions that harmed third parties. Courts are still setting precedent, but the direction is clear: companies will be held responsible for what their agents do.</p>
+
+<p>In parallel, the insurance industry has moved to protect itself. <strong>ISO endorsement CG 40 47</strong> — which explicitly excludes AI-generated harms from Commercial General Liability coverage — is now embedded in policies covering an estimated <strong>82% of US property and casualty policies</strong>. Organizations that assumed their existing insurance covered AI incidents are discovering it does not.</p>
+
+<div class="callout danger">
+<div class="callout-label">Insurance Gap</div>
+<p>The CGL exclusion language in CG 40 47 is explicit: coverage is denied for bodily injury, property damage, or personal injury <strong>"arising out of, related to, or in any way involving"</strong> the use of AI systems. Dedicated AI coverage from specialty insurers exists, but underwriters have no standardized data on which to base risk assessments. The result is either no coverage, or premiums priced for the worst case.</p>
+</div>
+
+<h3>Regulatory Pressure Is Not Theoretical — It Has Deadlines</h3>
+<p>The EU AI Act's high-risk AI obligations take effect in <strong>August 2026</strong>. Organizations deploying AI in hiring, credit scoring, education, critical infrastructure, or law enforcement face mandatory conformity assessments, technical documentation, human oversight requirements, and incident reporting obligations — with fines up to <strong>€30M or 6% of global annual revenue</strong>.</p>
+
+<p>In the United States, <strong>38 states adopted approximately 100 AI-related legislative measures in 2025 alone</strong>. While no single federal framework exists, the patchwork of state laws creates compliance complexity that grows with every new deployment.</p>
+
+<div class="callout warn">
+<div class="callout-label">Compliance Clock</div>
+<p>SOC 2 auditors are already asking the question: <strong>"How do you govern your AI agents?"</strong> As of 2026, there is no standardized answer and no off-the-shelf tool to produce one. Every engagement becomes a custom engagement — at consulting rates, not SaaS rates.</p>
+</div>
+
+<h3>There Is No Self-Serve Tool</h3>
+<p>The most important feature of the current market is what does not exist. Every governance and compliance vendor in this space — without exception — is "contact sales" at enterprise price points starting at $100,000 per year. There is no tool an engineering team can install in 30 seconds, run against their codebase, and receive an actionable risk report from. That gap is the opportunity.</p>
+
+</div>
+</section>
+
+<!-- 2. SOLUTION -->
+<section class="doc-section" id="solution">
+<div class="section-number">02</div>
+<h2>The Solution <a href="#solution" class="anchor">#</a></h2>
+<div class="section-rule"></div>
+<div class="prose">
+
+<p>Agent Shield is a two-layer product: a free, open-source CLI that creates distribution and trust, paired with a paid platform for the teams that need continuous monitoring, team collaboration, and compliance reporting.</p>
+
+<h3>Layer 1 — The CLI (Free, Open Source)</h3>
+<p>Written in Rust for performance and binary distribution, the Agent Shield CLI does one thing extremely well: it scans a codebase and tells you what your AI agents can do, what risk they carry, and what compliance gaps exist. No configuration required. No account. No data leaves the machine.</p>
+
+<ul>
+<li><strong>Agent discovery</strong> across 10 frameworks: LangChain, LangGraph, CrewAI, AutoGen, OpenAI Assistants, Anthropic MCP, Anthropic Agent SDK, AWS Bedrock Agents, Vercel AI SDK, and custom agent patterns</li>
+<li><strong>Risk scoring 0–100</strong> based on autonomy level, tool access, data permissions, guardrail coverage, and blast radius</li>
+<li><strong>Compliance mapping</strong> to NIST AI RMF, ISO 42001, EU AI Act, and OWASP Agentic Top 10 — with specific control references, not vague guidance</li>
+<li><strong>SARIF output</strong> for CI/CD integration — block deployments of agents that exceed defined risk thresholds</li>
+<li>Runs in under 30 seconds on a full enterprise codebase</li>
+</ul>
+
+<div class="callout info">
+<div class="callout-label">Design Philosophy</div>
+<p>The CLI is explicitly designed to feel like <code style="color:var(--green);font-family:var(--mono)">npm audit</code>. Every developer already knows that workflow. A governance tool that developers actually run is infinitely more valuable than an enterprise platform they avoid. Distribution through developer trust, not enterprise sales.</p>
+</div>
+
+<h3>Layer 2 — The Platform (Paid, SaaS)</h3>
+<p>For teams that need more than a point-in-time scan, the Agent Shield platform provides continuous monitoring, team collaboration, and the audit-ready documentation that compliance frameworks demand.</p>
+
+<ul>
+<li><strong>Web dashboard</strong> with per-agent risk history, finding trends, and remediation tracking</li>
+<li><strong>Continuous monitoring</strong> — re-scans triggered by code changes, with drift alerts when agent risk profiles change</li>
+<li><strong>PDF compliance reports</strong> formatted for auditors and board-level risk reviews</li>
+<li><strong>Team collaboration</strong> — assign findings, track remediation, maintain evidence chains for SOC 2 and ISO 42001</li>
+<li><strong>Compliance templates</strong> that grow with each new regulation added to the library</li>
+</ul>
+
+<h3>Compliance Frameworks Covered</h3>
+
+<table class="comp-table">
+<thead>
+<tr>
+<th>Framework</th>
+<th>Coverage</th>
+<th>Why It Matters</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>NIST AI RMF</strong></td>
+<td>Full — Govern, Map, Measure, Manage</td>
+<td>Default framework for US federal contractors and SOC 2 AI addenda</td>
+</tr>
+<tr>
+<td><strong>ISO/IEC 42001</strong></td>
+<td>Certifiable AI management standard</td>
+<td>Required for EU market access; paired with ISO 27001 audits</td>
+</tr>
+<tr>
+<td><strong>EU AI Act</strong></td>
+<td>High-risk AI obligations, Art. 9-17</td>
+<td>August 2026 deadline; €30M or 6% revenue fines</td>
+</tr>
+<tr>
+<td><strong>OWASP Agentic Top 10</strong></td>
+<td>Full — 2026 v1 taxonomy</td>
+<td>First security taxonomy built specifically for autonomous agents</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</section>
+
+<!-- 3. MARKET -->
+<section class="doc-section" id="market">
+<div class="section-number">03</div>
+<h2>Market Opportunity <a href="#market" class="anchor">#</a></h2>
+<div class="section-rule"></div>
+<div class="prose">
+
+<p>The AI governance and compliance market is at an inflection point. Regulatory deadlines are converting a "nice to have" into a mandatory line item. Insurance exclusions are converting a theoretical risk into a financial one. The market that emerges from this inflection is large.</p>
+
+<div class="stat-grid">
+<div class="stat-cell">
+<div class="stat-value green">$492M</div>
+<div class="stat-label">AI governance platform market, 2026</div>
+<div class="stat-source">Grand View Research, 2025</div>
+</div>
+<div class="stat-cell">
+<div class="stat-value green">$8.23B</div>
+<div class="stat-label">Projected market size by 2034 (CAGR: 41.7%)</div>
+<div class="stat-source">Grand View Research, 2025</div>
+</div>
+<div class="stat-cell">
+<div class="stat-value amber">$4.7B+</div>
+<div class="stat-label">AI-specific insurance market projected by 2030</div>
+<div class="stat-source">Swiss Re Institute, 2025</div>
+</div>
+</div>
+
+<p>The AI insurance market estimate deserves particular attention. Swiss Re's base case is $4.7B by 2030; the bull case — which assumes rapid regulatory clarity and actuarial data availability — is <strong>$500B by 2030</strong>, comparable to the cyber insurance market at maturity. The primary constraint on that market developing is the absence of standardized risk data. Agent Shield is positioned to become the infrastructure that produces that data.</p>
+
+<h3>Total Addressable Market</h3>
+
+<div class="market-funnel">
+<div class="funnel-row">
+<div class="funnel-label">TAM</div>
+<div class="funnel-bar-wrap">
+<div class="funnel-bar tam">All companies deploying AI agents &mdash; $8.23B by 2034</div>
+</div>
+</div>
+<div class="funnel-row">
+<div class="funnel-label">SAM</div>
+<div class="funnel-bar-wrap">
+<div class="funnel-bar sam">US/EU enterprise + mid-market with compliance obligations &mdash; ~$1.8B</div>
+</div>
+</div>
+<div class="funnel-row">
+<div class="funnel-label">SOM (3yr)</div>
+<div class="funnel-bar-wrap">
+<div class="funnel-bar som">Reachable via open-source distribution &mdash; $40M ARR</div>
+</div>
+</div>
+</div>
+
+<p>By end of 2026, Gartner projects that <strong>AI agents will be used in 40% of enterprise applications</strong>, up from under 5% in 2025. That is not a slow adoption curve — that is a step function. The governance infrastructure does not exist yet. It needs to be built before the agents arrive, not after.</p>
+
+<h3>Beachhead Market</h3>
+<p>The immediate target is the intersection of two existing pain points: <strong>companies that already have SOC 2 certification and are now deploying AI agents</strong>. This population is estimated at over 10,000 companies in the US alone. They have compliance infrastructure, they have budget for security tooling, and they are already receiving questions from their auditors about AI governance that they cannot answer.</p>
+
+<p>The secondary market is companies seeking ISO 42001 certification — the first certifiable AI management standard — as a competitive differentiator for enterprise sales in European markets.</p>
+
+</div>
+</section>
+
+<!-- 4. BUSINESS MODEL -->
+<section class="doc-section" id="business">
+<div class="section-number">04</div>
+<h2>Business Model <a href="#business" class="anchor">#</a></h2>
+<div class="section-rule"></div>
+<div class="prose">
+
+<p>The model is straightforward: give away the tool that creates the habit, charge for the infrastructure that makes it operational at scale. Pricing is per-agent-monitored per month — directly aligned with customer value and easy to forecast as agent deployments grow.</p>
+
+<h3>Pricing Tiers</h3>
+
+<ul class="tier-list" style="list-style:none;margin:28px 0">
+<li style="display:grid;grid-template-columns:140px 120px 1fr;gap:20px;padding:16px 0;border-bottom:1px solid var(--border);align-items:center">
+<span style="font-family:var(--mono);font-size:13px;color:var(--text)">CLI (Free)</span>
+<span style="font-size:15px;font-weight:600;color:var(--green);font-family:var(--mono)">$0</span>
+<span style="font-size:13px;color:var(--muted)">Unlimited local scans, all frameworks, SARIF output, MIT license. Distribution engine.</span>
+</li>
+<li style="display:grid;grid-template-columns:140px 120px 1fr;gap:20px;padding:16px 0;border-bottom:1px solid var(--border);align-items:center">
+<span style="font-family:var(--mono);font-size:13px;color:var(--text)">Team</span>
+<span style="font-size:15px;font-weight:600;color:var(--green);font-family:var(--mono)">$1,500/mo</span>
+<span style="font-size:13px;color:var(--muted)">Up to 25 agents monitored. Dashboard, PDF reports, CI/CD integration, 5 seats.</span>
+</li>
+<li style="display:grid;grid-template-columns:140px 120px 1fr;gap:20px;padding:16px 0;border-bottom:1px solid var(--border);align-items:center">
+<span style="font-family:var(--mono);font-size:13px;color:var(--text)">Business</span>
+<span style="font-size:15px;font-weight:600;color:var(--green);font-family:var(--mono)">$5,000/mo</span>
+<span style="font-size:13px;color:var(--muted)">Up to 100 agents monitored. Full compliance library, audit export, 25 seats, SSO.</span>
+</li>
+<li style="display:grid;grid-template-columns:140px 120px 1fr;gap:20px;padding:16px 0;align-items:center">
+<span style="font-family:var(--mono);font-size:13px;color:var(--text)">Enterprise</span>
+<span style="font-size:15px;font-weight:600;color:var(--green);font-family:var(--mono)">$15,000/mo</span>
+<span style="font-size:13px;color:var(--muted)">Unlimited agents. Custom compliance templates, dedicated support, on-premise option, SLA.</span>
+</li>
+</ul>
+
+<h3>Unit Economics</h3>
+<p>Software-delivered compliance tooling has inherently favorable unit economics. <strong>Gross margin is projected at 95%+</strong> — infrastructure costs are low, there are no physical goods, and the compliance template library is developed once and reused across all customers. The marginal cost of serving an additional customer approaches zero.</p>
+
+<div class="stat-grid">
+<div class="stat-cell">
+<div class="stat-value green">$594K</div>
+<div class="stat-label">Year 1 ARR target (33 Team + 8 Business customers)</div>
+<div class="stat-source">Conservative case, organic growth only</div>
+</div>
+<div class="stat-cell">
+<div class="stat-value green">$9.3M</div>
+<div class="stat-label">Year 3 ARR target (mix of all tiers + Enterprise)</div>
+<div class="stat-source">With modest paid distribution investment</div>
+</div>
+<div class="stat-cell">
+<div class="stat-value amber">95%+</div>
+<div class="stat-label">Projected gross margin at scale</div>
+<div class="stat-source">Software + compliance data model</div>
+</div>
+</div>
+
+<p>The open-source CLI is not a cost center — it is a distribution channel. Every engineer who runs the CLI is a potential champion for the paid platform within their organization. Every GitHub star is a qualified lead. The model is engineered to reduce the cost of distribution to near zero.</p>
+
+<div class="callout info">
+<div class="callout-label">Longer-Term Revenue Vector</div>
+<p>As the agent risk dataset grows, it becomes valuable to insurers as an actuarial input. A data licensing or certified assessment partnership with one or two specialty AI insurers could become a significant revenue stream by Year 3 — with margins that exceed even the platform business.</p>
+</div>
+
+</div>
+</section>
+
+<!-- 5. COMPETITIVE LANDSCAPE -->
+<section class="doc-section" id="competitive">
+<div class="section-number">05</div>
+<h2>Competitive Landscape <a href="#competitive" class="anchor">#</a></h2>
+<div class="section-rule"></div>
+<div class="prose">
+
+<p>The AI governance space has attracted serious capital. Every major player, however, shares two critical characteristics: they require enterprise sales cycles, and none offer self-serve access. The market is being built from the top down. Agent Shield is building from the bottom up.</p>
+
+<table class="comp-table">
+<thead>
+<tr>
+<th>Company</th>
+<th>Funding</th>
+<th>Positioning</th>
+<th>Gap</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><span class="co">Oasis Security</span></td>
+<td>$195M</td>
+<td>Non-human identity (NHI) management, enterprise</td>
+<td><span class="tag ent">Enterprise Only</span> NHI focus, not agent-specific compliance</td>
+</tr>
+<tr>
+<td><span class="co">Zenity</span></td>
+<td>$55M</td>
+<td>Microsoft ecosystem, low-code/no-code AI governance</td>
+<td><span class="tag ent">Enterprise Only</span> Microsoft-centric, no developer CLI</td>
+</tr>
+<tr>
+<td><span class="co">Safe Security AURA</span></td>
+<td>Series B</td>
+<td>AI Trust Score, bundled with broader cyber risk platform</td>
+<td><span class="tag ent">Enterprise Only</span> Compliance bundled, not primary product</td>
+</tr>
+<tr>
+<td><span class="co">Snyk agent-scan</span></td>
+<td>Public co.</td>
+<td>Open source, security-focused agent scanning</td>
+<td><span class="tag oss">OSS</span> Security only — no compliance mapping, no reports</td>
+</tr>
+<tr>
+<td><span class="co">Microsoft Agent Gov. Toolkit</span></td>
+<td>Free</td>
+<td>Azure-native, basic governance tooling</td>
+<td><span class="tag free">Free</span> Sets the floor; Azure-only, no multi-framework</td>
+</tr>
+</tbody>
+</table>
+
+<p>The defining characteristic of this competitive landscape is pricing opacity. Every commercial competitor operates on a "contact sales" model, with no public pricing and no self-serve tier. Industry estimates put entry-level contracts at <strong>$100,000 per year and above</strong>. This is not a feature — it is a gap. The 10,000-employee company is served. The 50-person startup deploying AI agents is not.</p>
+
+<h3>Recent Acquisition Activity</h3>
+<p>The M&A activity in this space is a signal, not noise. Large platform vendors are buying AI governance capabilities because they cannot build them fast enough:</p>
+
+<ul>
+<li><strong>Robust Intelligence</strong> acquired by Cisco for approximately $400M — red-team and AI validation capabilities</li>
+<li><strong>CalypsoAI</strong> acquired by F5 for approximately $180M — AI security and observability</li>
+<li><strong>Lakera</strong> acquired by Check Point — prompt injection and LLM security</li>
+<li><strong>Protect AI</strong> acquired by Palo Alto Networks for $500–700M — ML model security scanning</li>
+</ul>
+
+<p>Each of these acqui-hires followed the same pattern: build a focused, open-source-adjacent tool, gain developer trust, then acquire or exit at a premium to a platform vendor that needs the capability. Agent Shield is designed to follow that same path — or to become the independent platform that survives it.</p>
+
+<div class="callout info">
+<div class="callout-label">Competitive Position</div>
+<p>The defensible position is not being the most feature-rich enterprise platform — it is being the <strong>first tool developers actually use</strong>, the one embedded in CI/CD pipelines, the one that generates the risk data that becomes the industry standard. Distribution through developer adoption is a moat that enterprise sales cannot replicate quickly.</p>
+</div>
+
+</div>
+</section>
+
+<!-- 6. WHY NOW -->
+<section class="doc-section" id="why-now">
+<div class="section-number">06</div>
+<h2>Why Now <a href="#why-now" class="anchor">#</a></h2>
+<div class="section-rule"></div>
+<div class="prose">
+
+<p>Timing is the most important variable in market entry. Five conditions are converging in 2026 that make this moment uniquely suited for Agent Shield's approach — and that make waiting genuinely costly.</p>
+
+<h3>1. The EU AI Act Deadline Is a Hard Forcing Function</h3>
+<p>August 2026 is not a soft target. It is a statutory date with <strong>fines up to €30M or 6% of global annual revenue</strong> for non-compliant high-risk AI deployments. Organizations deploying AI in finance, healthcare, HR, or critical infrastructure are actively seeking documentation they can show regulators. The window between "preparing now" and "scrambling at the last minute" closes in approximately six months.</p>
+
+<h3>2. State-Level Regulation Creates Compliance Complexity at Scale</h3>
+<p>Thirty-eight US states adopted approximately 100 AI-related legislative measures in 2025. Unlike GDPR — which, despite its flaws, provided a single compliance target — US AI regulation is fragmenting. An organization operating in multiple states faces an overlapping patchwork of obligations. Tools that map agent risk to multiple regulatory frameworks simultaneously become dramatically more valuable as the number of frameworks grows.</p>
+
+<h3>3. Insurance Exclusions Are Forcing Documentation</h3>
+<p>When ISO CGL exclusion CG 40 47 removes AI from standard coverage, the immediate buyer response is to seek specialty AI coverage. Specialty insurers are asking the same question that SOC 2 auditors are asking: <strong>what controls do you have over your AI agents?</strong> An audit report from Agent Shield is an answer. Without that report, the answer is "none" — which means either no coverage or a premium priced for maximum exposure.</p>
+
+<h3>4. Agent Framework Standardization Has Made Scanning Feasible</h3>
+<p>Two years ago, the AI agent ecosystem was too fragmented to scan systematically. Today, Model Context Protocol (MCP) and Agent-to-Agent (A2A) protocols are emerging as standards. The 10 major frameworks Agent Shield targets represent the overwhelming majority of production agent deployments. Scanning is now a tractable engineering problem, not an impossible one.</p>
+
+<h3>5. The Auditor Question Has No Answer Yet</h3>
+<p>SOC 2 auditors are currently asking "how do you govern your AI agents?" as an informational inquiry. By 2027, it will be a scored control. Every organization that has deployed AI agents without governance infrastructure will face a retroactive compliance remediation project. The cost of addressing this proactively — with a $1,500/month tool — is trivially small compared to the cost of addressing it reactively, with consultants, after an audit finding or an incident.</p>
+
+</div>
+</section>
+
+<!-- 7. TEAM AND MOAT -->
+<section class="doc-section" id="team">
+<div class="section-number">07</div>
+<h2>Team &amp; Moat <a href="#team" class="anchor">#</a></h2>
+<div class="section-rule"></div>
+<div class="prose">
+
+<h3>Builder Profile</h3>
+<p>Agent Shield is built by a 25-year software engineer currently working as a Senior Development Manager at Amazon. Three-time Microsoft MVP. The LLM expertise is not recent — <strong>first books on large language models were published in 2020</strong>, before most of the market understood what they were. The combination of deep systems engineering experience, enterprise software delivery background, and early LLM expertise is the relevant credential here: this is not a researcher turned founder, or a founder who learned to code. It is an engineer who has shipped software at Amazon's scale and spent six years studying the specific domain.</p>
+
+<h3>The Compounding Moat</h3>
+<p>The business case for Agent Shield is not just a product — it is a data asset that becomes more valuable over time. Each scan that runs through the platform contributes to a structured dataset of agent risk profiles, tool configurations, guardrail patterns, and remediation outcomes. That dataset has three layers of compounding value:</p>
+
+<ul class="moat-list">
+<li>
+<span class="moat-year">Year 1–2</span>
+<div class="moat-desc">
+<strong>Benchmark data</strong>
+Risk scores are more meaningful when compared to a baseline. "Your CustomerSupportBot scores 72/100" is less actionable than "72/100, which is higher than 89% of similar agents in production." That benchmark only exists with network data.
+</div>
+</li>
+<li>
+<span class="moat-year">Year 2–3</span>
+<div class="moat-desc">
+<strong>Compliance template library</strong>
+Each new regulation added to the compliance library increases value for all existing customers. The EU AI Act templates, once built, are available to every paying customer at zero marginal cost. The library grows; the cost per customer does not.
+</div>
+</li>
+<li>
+<span class="moat-year">Year 3+</span>
+<div class="moat-desc">
+<strong>Actuarial dataset</strong>
+Structured, longitudinal risk data on AI agent deployments is precisely what the specialty insurance market needs to price policies accurately. A partnership with one or two AI insurance underwriters — providing anonymized risk data as an actuarial input — turns the compliance platform into the foundation of the AI insurance market's data infrastructure.
+</div>
+</li>
+</ul>
+
+<h3>Distribution Moat</h3>
+<p>The open-source CLI is not a marketing decision — it is a distribution strategy. Every engineer who installs the CLI and runs a scan is a qualified lead. They have already experienced the product, already seen the output, and already understand the value. The conversion funnel from CLI user to paid platform customer is shorter and cheaper than any inbound or outbound sales motion.</p>
+
+<p>The CLI also creates a category-definition moat. If "agent-shield scan" becomes the default way engineers think about AI agent risk — the way "npm audit" is the default way they think about dependency vulnerabilities — the switching cost becomes the cognitive cost of changing a familiar workflow. That is a durable moat.</p>
+
+<div class="callout info">
+<div class="callout-label">The Long Game</div>
+<p>The vision is not to be acquired by a platform vendor in three years, though that outcome is available. The vision is to be the <strong>infrastructure layer for AI governance</strong> — the tool that every compliance team uses, the data that every AI insurer needs, and the framework that every auditor references. That position, once established, is extraordinarily difficult to displace.</p>
+</div>
+
+</div>
+</section>
+
+</main>
+</div>
+
+<footer>
+<div class="footer-inner">
+<p>&copy; 2026 Agent Shield. Open source under MIT License.</p>
+<div class="footer-links">
+<a href="../index.html">Home</a>
+<a href="../pricing.html">Pricing</a>
+<a href="../dashboard.html">Dashboard</a>
+<a href="https://github.com/cschuman/agent-shield">GitHub</a>
+</div>
+</div>
+</footer>
+
+<script>
+// Active TOC highlighting
+(function(){
+var sections=document.querySelectorAll('.doc-section[id]');
+var links=document.querySelectorAll('.toc a');
+function update(){
+var scrollY=window.scrollY+120;
+var current='';
+sections.forEach(function(s){if(s.offsetTop<=scrollY)current=s.id});
+links.forEach(function(l){
+l.classList.toggle('active',l.getAttribute('href')==='#'+current);
+});
+}
+window.addEventListener('scroll',update,{passive:true});
+update();
+})();
+</script>
+
+</body>
+</html>

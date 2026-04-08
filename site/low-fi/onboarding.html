@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Get Started — Agent Shield</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0A0A0F;--surface:#13131A;--border:#252530;
+  --green:#00FF88;--amber:#FFB800;--red:#FF3366;
+  --text:#E8E8ED;--muted:#8888A0;--faint:#44445A;
+  --mono:'JetBrains Mono',monospace;--sans:'DM Sans',sans-serif;
+}
+body{
+  background:var(--bg);color:var(--text);font-family:var(--sans);
+  line-height:1.6;-webkit-font-smoothing:antialiased;
+  min-height:100vh;
+}
+a{color:var(--green);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* TOP BAR */
+.topbar{
+  border-bottom:1px solid var(--border);
+  padding:16px 40px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.logo{
+  font-family:var(--mono);font-weight:700;font-size:16px;
+  display:flex;align-items:center;gap:8px;
+}
+.logo-icon{
+  width:14px;height:14px;border:2px solid var(--green);
+  transform:rotate(45deg);display:flex;align-items:center;justify-content:center;
+}
+.logo-icon::after{
+  content:'';width:5px;height:5px;background:var(--green);transform:rotate(-45deg);
+}
+.skip{font-size:13px;color:var(--muted)}
+
+/* LAYOUT */
+.page{
+  max-width:760px;margin:0 auto;
+  padding:60px 40px 80px;
+}
+
+.page-header{margin-bottom:48px}
+.page-header h1{font-size:28px;font-weight:700;letter-spacing:-0.5px;margin-bottom:8px}
+.page-header p{font-size:15px;color:var(--muted)}
+
+/* PROGRESS */
+.progress{
+  display:flex;align-items:center;gap:0;
+  margin-bottom:52px;
+}
+.step-node{
+  display:flex;align-items:center;gap:0;
+}
+.step-circle{
+  width:32px;height:32px;border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:12px;font-weight:600;
+  flex-shrink:0;
+}
+.step-circle.done{background:var(--green);border-color:var(--green);color:var(--bg)}
+.step-circle.active{border-color:var(--green);color:var(--green)}
+.step-circle.future{color:var(--faint)}
+.step-label{
+  font-size:12px;padding:0 12px;white-space:nowrap;
+}
+.step-label.done{color:var(--green)}
+.step-label.active{color:var(--text);font-weight:600}
+.step-label.future{color:var(--faint)}
+.step-line{flex:1;height:1px;background:var(--border);min-width:20px}
+.step-line.done{background:var(--green)}
+
+/* STEP CARD */
+.step-card{
+  border:1px solid var(--border);
+  background:var(--surface);
+  margin-bottom:16px;
+}
+.step-card.active{border-color:var(--green)}
+.step-card.done-card{opacity:0.5}
+
+.step-card-header{
+  padding:20px 24px;
+  display:flex;align-items:center;gap:16px;
+  border-bottom:1px solid var(--border);
+}
+.step-card.active .step-card-header{border-bottom-color:var(--border)}
+.step-num{
+  font-family:var(--mono);font-size:11px;letter-spacing:1px;
+  color:var(--muted);
+  padding:4px 8px;border:1px solid var(--border);
+}
+.step-card.active .step-num{color:var(--green);border-color:var(--green)}
+.step-card.done-card .step-num{color:var(--green);border-color:var(--green);background:rgba(0,255,136,0.08)}
+.step-card-header h2{font-size:15px;font-weight:600}
+.step-done-mark{
+  margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--green);
+}
+.step-card-body{padding:24px}
+
+/* CODE BLOCK */
+.code-block{
+  background:var(--bg);border:1px solid var(--border);
+  font-family:var(--mono);font-size:13px;color:var(--text);
+  padding:16px 20px;margin-bottom:12px;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  overflow-x:auto;
+}
+.code-block code{white-space:nowrap}
+.code-block .g{color:var(--green)}
+.copy-btn{
+  font-family:var(--mono);font-size:11px;letter-spacing:0.5px;
+  color:var(--muted);border:1px solid var(--border);
+  background:transparent;padding:5px 10px;cursor:pointer;
+  flex-shrink:0;white-space:nowrap;
+}
+.copy-btn:hover{border-color:var(--muted);color:var(--text)}
+
+/* KEY DISPLAY */
+.api-key-box{
+  background:var(--bg);border:1px solid var(--border);
+  padding:16px 20px;margin-bottom:12px;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+}
+.api-key-value{
+  font-family:var(--mono);font-size:12px;color:var(--green);
+  letter-spacing:0.5px;word-break:break-all;
+}
+.key-warning{
+  font-size:12px;color:var(--amber);
+  display:flex;align-items:center;gap:6px;margin-top:8px;
+}
+
+/* HINT TEXT */
+.hint{font-size:13px;color:var(--muted);margin-bottom:16px}
+
+/* NEXT BUTTON */
+.next-btn{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:10px 20px;
+  background:var(--green);color:var(--bg);
+  font-size:13px;font-weight:700;font-family:var(--sans);
+  border:none;cursor:pointer;margin-top:8px;
+}
+.next-btn:hover{background:#00FFAA}
+
+/* FUTURE STEP */
+.step-card-future .step-card-body{display:none}
+.step-card.future-step{border-color:var(--border);opacity:0.6}
+.step-card.future-step .step-card-header{border-bottom:none}
+
+/* DASHBOARD LINK BOX */
+.dashboard-link-box{
+  border:1px solid var(--green);padding:24px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.dashboard-link-box h3{font-size:15px;font-weight:600;margin-bottom:4px}
+.dashboard-link-box p{font-size:13px;color:var(--muted)}
+.go-btn{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:10px 20px;
+  background:var(--green);color:var(--bg);
+  font-size:13px;font-weight:700;font-family:var(--sans);
+  border:none;cursor:pointer;white-space:nowrap;
+  flex-shrink:0;margin-left:24px;
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-icon"></div>
+    agent<span style="color:var(--green)">shield</span>
+  </div>
+  <a href="../dashboard.html" class="skip">Skip setup</a>
+</div>
+
+<div class="page">
+
+  <div class="page-header">
+    <h1>Let's get you set up.</h1>
+    <p>Four steps to your first risk report. Takes about 5 minutes.</p>
+  </div>
+
+  <!-- Progress bar -->
+  <div class="progress">
+    <div class="step-node">
+      <div class="step-circle active">1</div>
+      <div class="step-label active">Install CLI</div>
+    </div>
+    <div class="step-line"></div>
+    <div class="step-node">
+      <div class="step-circle future">2</div>
+      <div class="step-label future">API Key</div>
+    </div>
+    <div class="step-line"></div>
+    <div class="step-node">
+      <div class="step-circle future">3</div>
+      <div class="step-label future">First Scan</div>
+    </div>
+    <div class="step-line"></div>
+    <div class="step-node">
+      <div class="step-circle future">4</div>
+      <div class="step-label future">Dashboard</div>
+    </div>
+  </div>
+
+  <!-- Step 1 — active -->
+  <div class="step-card active">
+    <div class="step-card-header">
+      <span class="step-num">STEP 01</span>
+      <h2>Install the Agent Shield CLI</h2>
+    </div>
+    <div class="step-card-body">
+      <p class="hint">Agent Shield is a Rust CLI. Install it with Cargo in one command.</p>
+      <div class="code-block">
+        <code><span class="g">cargo install</span> agent-shield</code>
+        <button class="copy-btn">COPY</button>
+      </div>
+      <p class="hint" style="margin-top:8px">Verify the install:</p>
+      <div class="code-block">
+        <code><span class="g">agent-shield</span> --version</code>
+        <button class="copy-btn">COPY</button>
+      </div>
+      <p class="hint" style="color:var(--faint);margin-top:4px">Expected output: <code style="font-family:var(--mono);font-size:12px;color:var(--muted)">agent-shield 0.9.1</code></p>
+      <button class="next-btn">CLI Installed — Continue &rarr;</button>
+    </div>
+  </div>
+
+  <!-- Step 2 — future -->
+  <div class="step-card future-step">
+    <div class="step-card-header">
+      <span class="step-num">STEP 02</span>
+      <h2>Generate an API key</h2>
+    </div>
+  </div>
+
+  <!-- Step 3 — future -->
+  <div class="step-card future-step">
+    <div class="step-card-header">
+      <span class="step-num">STEP 03</span>
+      <h2>Run your first scan</h2>
+    </div>
+  </div>
+
+  <!-- Step 4 — future -->
+  <div class="step-card future-step">
+    <div class="step-card-header">
+      <span class="step-num">STEP 04</span>
+      <h2>View your dashboard</h2>
+    </div>
+  </div>
+
+</div>
+
+<!-- ========================
+     ALTERNATE STATE: Step 2 active (shown for reference — viewer can imagine progression)
+     ======================== -->
+<!--
+STEP 2 ACTIVE BODY (replace step-card-body content):
+
+  <p class="hint">Your API key links CLI scans to your account. Keep it secret.</p>
+  <div class="api-key-box">
+    <div class="api-key-value">sk-as-prod-4f8a2c1e9b3d7f6a2c4e8b1d3f9a2c4e</div>
+    <button class="copy-btn">COPY KEY</button>
+  </div>
+  <p class="key-warning">&#x26A0; This key is shown once. Copy it now.</p>
+  <p class="hint" style="margin-top:16px">Set it as an environment variable:</p>
+  <div class="code-block">
+    <code><span class="g">export</span> AGENT_SHIELD_KEY=sk-as-prod-4f8a2c1e9b3d7f6a2c4e8b1d3f9a2c4e</code>
+    <button class="copy-btn">COPY</button>
+  </div>
+  <button class="next-btn">Key Saved — Continue &rarr;</button>
+
+STEP 3 ACTIVE BODY:
+
+  <p class="hint">Point the scanner at your project directory. Use <code style="font-family:var(--mono);font-size:12px">--upload</code> to push results to your dashboard.</p>
+  <div class="code-block">
+    <code><span class="g">agent-shield</span> scan ./my-project --upload</code>
+    <button class="copy-btn">COPY</button>
+  </div>
+  <p class="hint" style="margin-top:8px">Replace <code style="font-family:var(--mono);font-size:12px;color:var(--muted)">./my-project</code> with the path to your codebase. The <code style="font-family:var(--mono);font-size:12px;color:var(--muted)">--upload</code> flag sends results to your dashboard automatically.</p>
+  <button class="next-btn">Scan Complete — Continue &rarr;</button>
+
+STEP 4 ACTIVE BODY:
+
+  <p class="hint" style="color:var(--green)">Your scan results are ready.</p>
+  <div class="dashboard-link-box">
+    <div>
+      <h3>37 agents discovered across 6 repositories</h3>
+      <p>4 critical findings need your attention.</p>
+    </div>
+    <a href="../dashboard.html" class="go-btn">View Dashboard &rarr;</a>
+  </div>
+-->
+
+</body>
+</html>
