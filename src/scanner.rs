@@ -1,4 +1,6 @@
-use crate::frameworks::{AgentFramework, DetectionPattern};
+use crate::engine::Engine;
+use crate::engine::matcher::{FileCtx, Lang};
+use crate::frameworks::AgentFramework;
 use regex::Regex;
 use serde::Serialize;
 use std::collections::HashSet;
@@ -84,11 +86,8 @@ const SCAN_EXTENSIONS: &[&str] = &[
 pub fn scan_directory(path: &Path) -> Result<Vec<DiscoveredAgent>, Box<dyn std::error::Error>> {
     let mut agents = Vec::new();
     let mut seen_files: HashSet<PathBuf> = HashSet::new();
+    let engine = Engine::compile_builtin();
 
-    // First pass: scan package manifests for framework dependencies
-    let detected_frameworks = detect_frameworks_from_manifests(path);
-
-    // Second pass: scan source files for agent patterns
     for entry in WalkDir::new(path)
         .follow_links(false)
         .into_iter()
@@ -112,6 +111,11 @@ pub fn scan_directory(path: &Path) -> Result<Vec<DiscoveredAgent>, Box<dyn std::
             continue;
         }
 
+        let lang = match lang_from_ext(ext) {
+            Some(l) => l,
+            None => continue,
+        };
+
         if seen_files.contains(file_path) {
             continue;
         }
@@ -122,21 +126,22 @@ pub fn scan_directory(path: &Path) -> Result<Vec<DiscoveredAgent>, Box<dyn std::
             Err(_) => continue, // skip binary/unreadable files
         };
 
-        // Check each framework's patterns against this file
-        for framework in AgentFramework::all() {
-            let matches = check_framework_patterns(&content, &framework);
-            // Require minimum confidence: 2+ matches for broad frameworks,
-            // 1 match for specific ones
-            let min_matches = match framework {
-                AgentFramework::VercelAI | AgentFramework::CustomAgent => 2,
-                _ => 1,
-            };
-            if matches.len() >= min_matches {
+        let ctx = FileCtx {
+            path: file_path,
+            lang,
+            content: &content,
+        };
+
+        for rule in &engine.rules.rules {
+            let hits = rule.matcher.matches_file(&ctx);
+            if hits.len() >= rule.min_match_count as usize {
+                let raw_matches: Vec<(usize, String)> =
+                    hits.into_iter().map(|h| (h.line, h.snippet)).collect();
                 let agent = extract_agent_details(
                     file_path,
                     &content,
-                    &framework,
-                    &matches,
+                    &rule.framework,
+                    &raw_matches,
                 );
                 agents.push(agent);
             }
@@ -146,103 +151,22 @@ pub fn scan_directory(path: &Path) -> Result<Vec<DiscoveredAgent>, Box<dyn std::
     // Deduplicate agents by file + framework
     agents.dedup_by(|a, b| a.file_path == b.file_path && a.framework == b.framework);
 
-    // Enrich with manifest-level framework info
-    for fw in &detected_frameworks {
-        // Check if we already found agents for this framework
-        let already_found = agents.iter().any(|a| a.framework == fw.name());
-        if !already_found {
-            // Add a note that the framework is in dependencies but no agents found in code
-            // This is informational, not an agent entry
-        }
-    }
-
     Ok(agents)
 }
 
-fn detect_frameworks_from_manifests(path: &Path) -> Vec<AgentFramework> {
-    let mut found = Vec::new();
-
-    // Check package.json
-    let pkg_json = path.join("package.json");
-    if pkg_json.exists() {
-        if let Ok(content) = std::fs::read_to_string(&pkg_json) {
-            for fw in AgentFramework::all() {
-                for pattern in fw.detection_patterns() {
-                    if let DetectionPattern::PackageDep(dep) = pattern {
-                        if content.contains(dep) && !found.contains(&fw) {
-                            found.push(fw.clone());
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Check pyproject.toml
-    let pyproject = path.join("pyproject.toml");
-    if pyproject.exists() {
-        if let Ok(content) = std::fs::read_to_string(&pyproject) {
-            for fw in AgentFramework::all() {
-                for pattern in fw.detection_patterns() {
-                    if let DetectionPattern::PackageDep(dep) = pattern {
-                        if content.contains(dep) && !found.contains(&fw) {
-                            found.push(fw.clone());
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Check requirements.txt
-    let requirements = path.join("requirements.txt");
-    if requirements.exists() {
-        if let Ok(content) = std::fs::read_to_string(&requirements) {
-            for fw in AgentFramework::all() {
-                for pattern in fw.detection_patterns() {
-                    if let DetectionPattern::PackageDep(dep) = pattern {
-                        if content.contains(dep) && !found.contains(&fw) {
-                            found.push(fw.clone());
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    found
-}
-
-fn check_framework_patterns(content: &str, framework: &AgentFramework) -> Vec<(usize, String)> {
-    let mut matches = Vec::new();
-
-    for pattern in framework.detection_patterns() {
-        match pattern {
-            DetectionPattern::Import(import_str) => {
-                for (i, line) in content.lines().enumerate() {
-                    if line.contains(import_str)
-                        && (line.contains("import") || line.contains("require") || line.contains("use "))
-                    {
-                        matches.push((i + 1, line.trim().to_string()));
-                    }
-                }
-            }
-            DetectionPattern::CodePattern(pat) => {
-                if let Ok(re) = Regex::new(pat) {
-                    for (i, line) in content.lines().enumerate() {
-                        if re.is_match(line) {
-                            matches.push((i + 1, line.trim().to_string()));
-                        }
-                    }
-                }
-            }
-            DetectionPattern::PackageDep(_) | DetectionPattern::ConfigFile(_) => {
-                // Handled in manifest scan
-            }
-        }
-    }
-
-    matches
+fn lang_from_ext(ext: &str) -> Option<Lang> {
+    Some(match ext {
+        "py" => Lang::Python,
+        "js" | "jsx" => Lang::JavaScript,
+        "ts" | "tsx" => Lang::TypeScript,
+        "rs" => Lang::Rust,
+        "go" => Lang::Go,
+        "java" => Lang::Java,
+        "yaml" | "yml" => Lang::Yaml,
+        "json" => Lang::Json,
+        "toml" => Lang::Toml,
+        _ => return None,
+    })
 }
 
 fn extract_agent_details(

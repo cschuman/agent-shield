@@ -10,7 +10,7 @@
 
 pub mod matcher;
 
-use crate::frameworks::{AgentFramework, DetectionPattern};
+use crate::frameworks::AgentFramework;
 use matcher::{LangSet, Matcher};
 use regex::Regex;
 
@@ -66,27 +66,24 @@ impl Engine {
         Self::default()
     }
 
-    /// Compile the built-in detection rules from `frameworks.rs`.
+    /// Compile the built-in detection rules.
     ///
     /// One `CompiledRule` per `AgentFramework` variant. Each rule's matcher
-    /// is an `AnyOf` over every `DetectionPattern` declared for that variant.
-    /// This is intentionally lossless w.r.t. today's behavior: at the file
-    /// pass, `PackageDep` and `FilePresent` matchers return zero hits, so
-    /// the existing "Import + CodePattern only contribute to firing" logic
-    /// is preserved exactly.
+    /// is an `AnyOf` over the framework's primitives, declared inline below.
+    /// Before C4 these primitives lived as `DetectionPattern` values on
+    /// `AgentFramework::detection_patterns()`; that intermediate enum was
+    /// removed and the matcher tree is now the single source of truth.
     ///
-    /// In Week 2 this method is replaced by a YAML loader; the return type
-    /// stays the same.
+    /// At the file pass, `PackageDep` and `FilePresent` matchers return zero
+    /// hits, so the legacy "Import + CodePattern only contribute to firing"
+    /// behavior is preserved exactly. In Week 2 this method is replaced by
+    /// a YAML loader; the return type stays the same.
     pub fn compile_builtin() -> Self {
-        let mut rules = Vec::with_capacity(AgentFramework::all().len());
+        let frameworks = AgentFramework::all();
+        let mut rules = Vec::with_capacity(frameworks.len());
 
-        for fw in AgentFramework::all() {
-            let sub_matchers: Vec<Matcher> = fw
-                .detection_patterns()
-                .into_iter()
-                .map(translate_pattern)
-                .collect();
-
+        for fw in frameworks {
+            let sub_matchers = builtin_matchers_for(&fw);
             let min_match_count: u8 = match fw {
                 AgentFramework::VercelAI | AgentFramework::CustomAgent => 2,
                 _ => 1,
@@ -107,29 +104,113 @@ impl Engine {
     }
 }
 
-/// Translate a single legacy `DetectionPattern` into a `Matcher`.
+/// The hardcoded primitive set per framework — Week-1 home for what becomes
+/// YAML rule files in Week 2. Kept terse on purpose: each line maps to a
+/// future `match: { ... }` clause in the rule schema.
+fn builtin_matchers_for(fw: &AgentFramework) -> Vec<Matcher> {
+    let import = |s: &str| Matcher::ImportContains {
+        needle: s.to_string(),
+        languages: LangSet::Any,
+    };
+    let code = |p: &str| Matcher::CodeRegex {
+        pattern: Regex::new(p)
+            .unwrap_or_else(|e| panic!("invalid regex in built-in rule {:?}: {}", p, e)),
+        languages: LangSet::Any,
+    };
+    let pkg = |s: &str| Matcher::PackageDep {
+        name: s.to_string(),
+    };
+    let cfg = |s: &str| Matcher::FilePresent {
+        path: s.to_string(),
+    };
+
+    match fw {
+        AgentFramework::LangChain => vec![
+            import("langchain"),
+            import("from langchain"),
+            pkg("langchain"),
+            pkg("@langchain/core"),
+        ],
+        AgentFramework::LangGraph => vec![
+            import("langgraph"),
+            import("from langgraph"),
+            pkg("langgraph"),
+            pkg("@langchain/langgraph"),
+        ],
+        AgentFramework::CrewAI => vec![
+            import("crewai"),
+            import("from crewai"),
+            pkg("crewai"),
+        ],
+        AgentFramework::AutoGen => vec![
+            import("autogen"),
+            import("from autogen"),
+            pkg("autogen"),
+            pkg("pyautogen"),
+        ],
+        AgentFramework::OpenAIAssistants => vec![
+            code(r"client\.beta\.assistants"),
+            code(r"openai\.beta\.assistants"),
+            code(r"assistants\.create"),
+            code(r#"type.*=.*"assistant""#),
+        ],
+        AgentFramework::AnthropicMCP => vec![
+            import("@modelcontextprotocol"),
+            import("mcp"),
+            cfg("mcp.json"),
+            cfg(".mcp.json"),
+            code(r"McpServer"),
+            code(r"mcp_server"),
+        ],
+        AgentFramework::AnthropicAgentSDK => vec![
+            import("claude_agent_sdk"),
+            import("@anthropic-ai/agent-sdk"),
+            pkg("claude-agent-sdk"),
+        ],
+        AgentFramework::AWSBedrock => vec![
+            code(r"bedrock-agent"),
+            code(r"BedrockAgent"),
+            code(r"bedrock_agent"),
+            import("@aws-sdk/client-bedrock-agent"),
+        ],
+        AgentFramework::VercelAI => vec![
+            import("ai/"),
+            import("from 'ai'"),
+            import("from \"ai\""),
+            code(r"\bgenerateText\s*\("),
+            code(r"\bstreamText\s*\("),
+            code(r"\btool\s*\(\s*\{"),
+        ],
+        AgentFramework::CustomAgent => vec![
+            code(r"(?:system_prompt|systemPrompt)\s*[=:]"),
+            code(r"(?:tool_call|toolCall|function_call)\s*[=:\(]"),
+            code(r"agent[_.](?:loop|run|execute|step)\s*\("),
+        ],
+    }
+}
+
+/// Flatten a `Matcher` tree into human-readable descriptors, preserving the
+/// declaration order of `AnyOf`/`AllOf` children.
 ///
-/// Regex compilation panics on malformed patterns — acceptable for the
-/// hardcoded translation since all patterns are authored in `frameworks.rs`
-/// and verified at first run. The YAML loader in Week 2 must surface the
-/// same error as a quarantined-rule diagnostic instead of a panic.
-fn translate_pattern(pat: DetectionPattern) -> Matcher {
-    match pat {
-        DetectionPattern::Import(s) => Matcher::ImportContains {
-            needle: s.to_string(),
-            languages: LangSet::Any,
-        },
-        DetectionPattern::CodePattern(p) => Matcher::CodeRegex {
-            pattern: Regex::new(p)
-                .unwrap_or_else(|e| panic!("invalid regex in built-in rule {:?}: {}", p, e)),
-            languages: LangSet::Any,
-        },
-        DetectionPattern::PackageDep(s) => Matcher::PackageDep {
-            name: s.to_string(),
-        },
-        DetectionPattern::ConfigFile(s) => Matcher::FilePresent {
-            path: s.to_string(),
-        },
+/// Used by `frameworks::list_frameworks` to render the "Detection Method"
+/// column in the CLI's `frameworks` subcommand. After C4 this is the only
+/// way to introspect a rule's primitives — `DetectionPattern` is gone.
+pub fn describe_matcher(m: &Matcher) -> Vec<String> {
+    match m {
+        Matcher::ImportContains { needle, .. } => vec![format!("import: {}", needle)],
+        Matcher::CodeRegex { pattern, .. } => vec![format!("pattern: {}", pattern.as_str())],
+        Matcher::MultilineRegex { pattern, .. } => {
+            vec![format!("multiline: {}", pattern.as_str())]
+        }
+        Matcher::PackageDep { name } => vec![format!("package: {}", name)],
+        Matcher::FilePresent { path } => vec![format!("config: {}", path)],
+        Matcher::AnyOf(children) | Matcher::AllOf(children) => {
+            children.iter().flat_map(describe_matcher).collect()
+        }
+        Matcher::Not(inner) => describe_matcher(inner)
+            .into_iter()
+            .map(|s| format!("not({})", s))
+            .collect(),
     }
 }
 
