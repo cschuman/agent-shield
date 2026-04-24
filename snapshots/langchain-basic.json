@@ -1,0 +1,63 @@
+{
+  "agent_count": 1,
+  "agent_shield_version": "0.1.0",
+  "agents": [
+    {
+      "autonomy_tier": 3,
+      "data_access_summary": "",
+      "file_path": "./main.py",
+      "findings": [
+        {
+          "category": "PromptInjectionRisk",
+          "description": "Agent has no detectable system prompt defining its role, boundaries, or behavioral constraints.",
+          "framework_ref": "NIST AI RMF: MAP 2.3, MEASURE 2.6",
+          "remediation": "Add an explicit system prompt that defines the agent's role, scope, and prohibited actions.",
+          "severity": "Medium",
+          "title": "No system prompt detected"
+        },
+        {
+          "category": "MissingGuardrail",
+          "description": "Agent does not appear to validate or sanitize inputs before processing.",
+          "framework_ref": "NIST AI RMF: MANAGE 2.2, MEASURE 2.5",
+          "remediation": "Implement input validation and sanitization to prevent prompt injection attacks.",
+          "severity": "High",
+          "title": "No input validation detected"
+        },
+        {
+          "category": "MissingGuardrail",
+          "description": "Agent outputs are not filtered for sensitive data, PII, or inappropriate content.",
+          "framework_ref": "NIST AI RMF: MANAGE 2.3, MEASURE 2.7",
+          "remediation": "Add output filtering to prevent data leakage and inappropriate responses.",
+          "severity": "Medium",
+          "title": "No output filtering detected"
+        },
+        {
+          "category": "MissingGuardrail",
+          "description": "Agent has no apparent rate limiting, allowing unbounded execution.",
+          "framework_ref": "NIST AI RMF: MANAGE 3.1",
+          "remediation": "Add rate limiting to prevent runaway costs and denial-of-service scenarios.",
+          "severity": "Low",
+          "title": "No rate limiting detected"
+        },
+        {
+          "category": "MissingAuditTrail",
+          "description": "Agent actions are not logged for audit or forensic purposes.",
+          "framework_ref": "NIST AI RMF: GOVERN 1.5, MEASURE 4.1",
+          "remediation": "Implement comprehensive logging of all agent decisions, tool calls, and outputs.",
+          "severity": "Medium",
+          "title": "No audit trail detected"
+        }
+      ],
+      "framework": "LangChain",
+      "guardrail_count": 0,
+      "has_system_prompt": false,
+      "line_number": 2,
+      "name": "LangChain agent",
+      "permission_summary": "READ",
+      "risk_level": "Critical",
+      "risk_score": 100,
+      "tool_count": 0
+    }
+  ],
+  "overall_risk_score": 100
+}
