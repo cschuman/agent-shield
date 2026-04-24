@@ -2,6 +2,7 @@ mod scanner;
 mod scoring;
 mod report;
 mod frameworks;
+mod engine;
 
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
