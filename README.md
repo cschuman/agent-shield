@@ -4,6 +4,10 @@
 
 Discover, score, and audit every AI agent in your codebase. Get a risk report in under 30 seconds.
 
+## Status
+
+Pre-1.0. Detection rules are migrating from Rust to YAML data files. Schema is **experimental** and may change without notice. Not currently accepting community rule contributions — see [`docs/rules-design/round3-synthesis.md`](docs/rules-design/round3-synthesis.md) for the design exercise that produced the current direction.
+
 ```
 $ agent-shield scan ./my-project
 
