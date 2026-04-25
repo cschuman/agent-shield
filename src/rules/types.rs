@@ -121,6 +121,13 @@ impl ParsedMatcher {
 #[serde(deny_unknown_fields)]
 pub struct ParsedContextSignal {
     pub name: String,
+    /// Optional sub-key for parametrized signals like
+    /// `has_guardrail[input_validation]` or `has_permission[execute]`.
+    /// Scalar signals (`tool_count`, `has_system_prompt`, etc.) leave this
+    /// unset; the loader validates name+param combinations against the
+    /// matcher's evaluator surface.
+    #[serde(default)]
+    pub param: Option<String>,
     pub op: ParsedSignalOp,
     pub value: ParsedSignalValue,
 }

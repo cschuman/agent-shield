@@ -15,6 +15,7 @@
 //! v1.1 and the loader rejects it explicitly. See
 //! `docs/rules-design/round3-synthesis.md` §1.3, §1.5.
 
+pub mod loader;
 pub mod types;
 
 #[cfg(test)]

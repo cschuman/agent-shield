@@ -102,7 +102,77 @@ impl Engine {
             rules: CompiledRuleSet { rules },
         }
     }
+
+    /// Compile from a bundle of `(source_key, yaml_text)` pairs.
+    ///
+    /// Bad rules are quarantined into diagnostics rather than panicking.
+    /// Diagnostics are printed to stderr at engine init time; the caller
+    /// can also inspect the returned vec via `compile_yaml_with_diagnostics`.
+    /// The unconditional `.0` access here is the binary path — use the
+    /// `_with_diagnostics` variant in tests where you need to assert on
+    /// quarantined rules.
+    pub fn compile_yaml(bundle: &[(&str, &str)]) -> Self {
+        let (rules, diags) = Self::compile_yaml_with_diagnostics(bundle);
+        for d in &diags {
+            eprintln!(
+                "agent-shield: rule {} from {} quarantined: {}",
+                d.rule_id.as_deref().unwrap_or("<unparseable>"),
+                d.source,
+                d.message
+            );
+        }
+        rules
+    }
+
+    /// Variant that returns diagnostics instead of printing them. Used by
+    /// the C4 equivalence test and the C9 bad-rule fixtures.
+    pub fn compile_yaml_with_diagnostics(
+        bundle: &[(&str, &str)],
+    ) -> (Self, Vec<crate::rules::loader::RuleDiagnostic>) {
+        let (rules, diags) = crate::rules::loader::parse_bundle(bundle);
+        (
+            Self {
+                rules: CompiledRuleSet { rules },
+            },
+            diags,
+        )
+    }
 }
+
+/// Bundled detection rules — concatenated at build time via `include_str!`.
+///
+/// Order matches `framework_slug` traversal of `AgentFramework::all()` so
+/// the structural-equivalence test against `compile_builtin` doesn't need
+/// to sort. When adding a framework: add the variant to `AgentFramework`,
+/// the slug to `framework_slug`, the YAML file to `rules/builtin/`, and a
+/// new entry here in the same position.
+pub const EMBEDDED_DETECTION_RULES: &[(&str, &str)] = &[
+    ("langchain", include_str!("../../rules/builtin/langchain.yaml")),
+    ("langgraph", include_str!("../../rules/builtin/langgraph.yaml")),
+    ("crewai", include_str!("../../rules/builtin/crewai.yaml")),
+    ("autogen", include_str!("../../rules/builtin/autogen.yaml")),
+    (
+        "openai-assistants",
+        include_str!("../../rules/builtin/openai-assistants.yaml"),
+    ),
+    (
+        "anthropic-mcp",
+        include_str!("../../rules/builtin/anthropic-mcp.yaml"),
+    ),
+    (
+        "anthropic-agent-sdk",
+        include_str!("../../rules/builtin/anthropic-agent-sdk.yaml"),
+    ),
+    (
+        "aws-bedrock",
+        include_str!("../../rules/builtin/aws-bedrock.yaml"),
+    ),
+    ("vercel-ai", include_str!("../../rules/builtin/vercel-ai.yaml")),
+    (
+        "custom-agent",
+        include_str!("../../rules/builtin/custom-agent.yaml"),
+    ),
+];
 
 /// The hardcoded primitive set per framework — Week-1 home for what becomes
 /// YAML rule files in Week 2. Kept terse on purpose: each line maps to a
@@ -279,5 +349,54 @@ mod tests {
             engine.rules.rules.iter().all(|r| r.extends.is_none()),
             "extends must be None in v1.0 — overlay support arrives in v1.1"
         );
+    }
+
+    /// The YAML bundle must compile cleanly with zero diagnostics.
+    #[test]
+    fn embedded_yaml_loads_without_diagnostics() {
+        let (engine, diags) = Engine::compile_yaml_with_diagnostics(EMBEDDED_DETECTION_RULES);
+        assert!(
+            diags.is_empty(),
+            "expected zero diagnostics, got: {:#?}",
+            diags
+        );
+        assert_eq!(engine.rules.rules.len(), AgentFramework::all().len());
+    }
+
+    /// Structural equivalence: `compile_yaml(EMBEDDED_DETECTION_RULES)` must
+    /// produce a rule set semantically identical to `compile_builtin()`.
+    /// Same rule IDs, same frameworks, same min_match_count, same matcher
+    /// tree shape. We compare via Debug-print of matchers because Regex
+    /// doesn't implement PartialEq — Debug includes the pattern source
+    /// which is the structural property we care about.
+    #[test]
+    fn yaml_matches_compile_builtin_structurally() {
+        let from_code = Engine::compile_builtin();
+        let from_yaml = Engine::compile_yaml(EMBEDDED_DETECTION_RULES);
+        assert_eq!(
+            from_code.rules.rules.len(),
+            from_yaml.rules.rules.len(),
+            "rule count drift"
+        );
+        for (a, b) in from_code
+            .rules
+            .rules
+            .iter()
+            .zip(from_yaml.rules.rules.iter())
+        {
+            assert_eq!(a.id, b.id, "rule id drift");
+            assert_eq!(a.framework, b.framework, "framework drift for {}", a.id);
+            assert_eq!(
+                a.min_match_count, b.min_match_count,
+                "min_match_count drift for {}",
+                a.id
+            );
+            assert_eq!(
+                format!("{:?}", a.matcher),
+                format!("{:?}", b.matcher),
+                "matcher tree drift for {}",
+                a.id
+            );
+        }
     }
 }
