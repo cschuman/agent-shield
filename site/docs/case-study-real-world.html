@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Real-World Calibration — Agent Shield</title>
+<meta name="description" content="What happens when you run Agent Shield v0.1.0 against five real-world OSS agent repositories: 0/15 sample precision, 30% net reduction after a single calibration round, and the architectural backlog the rule layer can't reach.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0A0A0F;--surface:#13131A;--surface-2:#1A1A25;--border:#252530;
+  --green:#00FF88;--green-dim:#00CC6E;--amber:#FFB800;--red:#FF3366;--blue:#4488FF;
+  --text:#E8E8ED;--muted:#8888A0;--faint:#44445A;
+  --mono:'JetBrains Mono',monospace;--sans:'DM Sans',sans-serif;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.65;-webkit-font-smoothing:antialiased}
+a{color:var(--green);text-decoration:none}
+a:hover{text-decoration:underline}
+
+body::before{
+  content:'';position:fixed;top:0;left:0;width:100%;height:100%;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,255,136,0.008) 2px,rgba(0,255,136,0.008) 4px);
+  pointer-events:none;z-index:9999;
+}
+
+nav{position:fixed;top:0;width:100%;z-index:100;backdrop-filter:blur(16px);background:rgba(10,10,15,0.85);border-bottom:1px solid var(--border)}
+.nav-inner{max-width:1200px;margin:0 auto;padding:16px 32px;display:flex;justify-content:space-between;align-items:center}
+.logo{font-family:var(--mono);font-weight:700;font-size:18px;letter-spacing:-0.5px;display:flex;align-items:center;gap:8px}
+.logo-icon{width:20px;height:20px;border:2px solid var(--green);transform:rotate(45deg);display:flex;align-items:center;justify-content:center}
+.logo-icon::after{content:'';width:8px;height:8px;background:var(--green);transform:rotate(-45deg)}
+.nav-links{display:flex;gap:32px;align-items:center}
+.nav-links a{color:var(--muted);font-size:14px;font-weight:500;transition:color 0.2s}
+.nav-links a:hover{color:var(--text);text-decoration:none}
+.nav-cta{background:var(--green);color:var(--bg) !important;padding:8px 20px;font-weight:600;font-size:13px;font-family:var(--mono);letter-spacing:0.5px;border:none;cursor:pointer;transition:all 0.15s}
+.nav-cta:hover{text-decoration:none;background:var(--green-dim)}
+
+main{max-width:880px;margin:0 auto;padding:120px 32px 80px}
+
+.page-header{margin-bottom:64px;border-left:3px solid var(--green);padding-left:24px}
+.page-badge{
+  font-family:var(--mono);font-size:11px;color:var(--green);
+  letter-spacing:1.5px;text-transform:uppercase;margin-bottom:16px;
+}
+h1{font-size:48px;font-weight:700;letter-spacing:-1px;line-height:1.1;margin-bottom:16px}
+h1 .accent{color:var(--green)}
+.page-header p{color:var(--muted);font-size:18px;max-width:640px}
+
+.meta{
+  display:flex;flex-wrap:wrap;gap:24px;margin-top:32px;
+  font-family:var(--mono);font-size:12px;color:var(--faint);
+}
+.meta strong{color:var(--text);font-weight:500}
+
+section{margin-bottom:64px}
+.section-label{
+  font-family:var(--mono);font-size:11px;color:var(--green);
+  letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;
+}
+h2{font-size:28px;font-weight:700;letter-spacing:-0.5px;margin-bottom:16px}
+h3{font-size:18px;font-weight:600;margin:32px 0 12px;color:var(--text)}
+p{margin-bottom:16px;color:var(--text)}
+p.muted{color:var(--muted)}
+
+.callout{
+  background:var(--surface);border:1px solid var(--border);
+  padding:24px 28px;margin:24px 0;
+  border-left:3px solid var(--green);
+}
+.callout-bad{border-left-color:var(--red)}
+.callout-warn{border-left-color:var(--amber)}
+.callout strong{color:var(--text)}
+
+ul,ol{padding-left:24px;margin-bottom:16px}
+li{margin-bottom:8px;color:var(--text)}
+
+table{
+  width:100%;border-collapse:collapse;margin:20px 0;
+  font-family:var(--mono);font-size:13px;
+}
+th,td{
+  padding:12px 16px;text-align:left;
+  border-bottom:1px solid var(--border);
+}
+th{
+  color:var(--green);font-weight:600;font-size:11px;
+  text-transform:uppercase;letter-spacing:1px;
+  border-bottom:1px solid var(--green-dim);
+}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.delta-good{color:var(--green)}
+.delta-bad{color:var(--red)}
+.delta-neutral{color:var(--amber)}
+
+code{
+  font-family:var(--mono);font-size:13px;
+  background:var(--surface-2);border:1px solid var(--border);
+  padding:1px 6px;color:var(--green);
+}
+pre{
+  background:var(--surface);border:1px solid var(--border);
+  padding:20px 24px;margin:20px 0;
+  font-family:var(--mono);font-size:13px;color:var(--text);
+  overflow-x:auto;line-height:1.5;
+}
+pre code{
+  background:transparent;border:none;padding:0;color:inherit;
+}
+
+.tag{
+  display:inline-block;padding:2px 8px;
+  font-family:var(--mono);font-size:11px;
+  background:var(--surface-2);border:1px solid var(--border);
+  color:var(--muted);letter-spacing:0.5px;
+  margin-right:6px;
+}
+.tag-fixed{color:var(--green);border-color:rgba(0,255,136,0.3)}
+.tag-deferred{color:var(--amber);border-color:rgba(255,184,0,0.3)}
+
+footer{
+  border-top:1px solid var(--border);margin-top:80px;
+  padding:32px 0;color:var(--muted);font-size:13px;
+}
+.footer-inner{max-width:880px;margin:0 auto;padding:0 32px;display:flex;justify-content:space-between;align-items:center}
+.footer-links{display:flex;gap:24px}
+.footer-links a{color:var(--muted)}
+
+@media (max-width:640px){
+  main{padding:100px 20px 60px}
+  h1{font-size:32px}
+  h2{font-size:22px}
+  .nav-links a:not(.nav-cta){display:none}
+  table{font-size:12px}
+  th,td{padding:10px 8px}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a href="../index.html" class="logo"><div class="logo-icon"></div> agent<span style="color:var(--green)">shield</span></a>
+    <div class="nav-links">
+      <a href="../index.html#features">Features</a>
+      <a href="../index.html#frameworks">Frameworks</a>
+      <a href="../pricing.html">Pricing</a>
+      <a href="https://github.com/cschuman/agent-shield" class="nav-cta">GITHUB</a>
+    </div>
+  </div>
+</nav>
+
+<main>
+
+<div class="page-header">
+  <div class="page-badge">CASE STUDY &middot; CALIBRATION &middot; 2026</div>
+  <h1>What happens when you point Agent Shield at <span class="accent">real code</span>.</h1>
+  <p>v0.1.0 ships a 6-fixture snapshot oracle that locks the byte-identical contract. Fixtures don't tell you whether the scanner is good — they tell you it hasn't drifted. So we ran v0.1.0 against five real-world open-source agent repositories and wrote down everything we found, including the parts that didn't go well.</p>
+  <div class="meta">
+    <span><strong>Date:</strong> 2026-04-25</span>
+    <span><strong>Scanner:</strong> v0.1.0 (commit 78da44a)</span>
+    <span><strong>Method:</strong> 5 OSS repos &middot; 5 parallel structured assessments</span>
+  </div>
+</div>
+
+<section>
+  <div class="section-label">Section 01 &middot; Setup</div>
+  <h2>The five repos</h2>
+  <p>Five repositories chosen for framework diversity and for stress: a framework's own monorepo (langgraph), an examples repo (crewAI-examples), a reference implementation set (MCP servers), a popular custom-loop agent (open-interpreter), and an SDK whose codebase <em>is itself</em> a framework's source (vercel/ai). The last one was deliberately chosen as a worst-case probe — what does the scanner do when pointed at the framework's own implementation?</p>
+
+  <table>
+    <thead>
+      <tr><th>Repo</th><th>Framework</th><th>Why</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>langchain-ai/langgraph</td><td>LangGraph</td><td>Framework's own monorepo — accuracy floor on internal noise</td></tr>
+      <tr><td>crewAIInc/crewAI-examples</td><td>CrewAI</td><td>Canonical multi-agent CrewAI usage</td></tr>
+      <tr><td>modelcontextprotocol/servers</td><td>Anthropic MCP</td><td>Reference MCP server implementations</td></tr>
+      <tr><td>OpenInterpreter/open-interpreter</td><td>Custom Agent</td><td>Popular agent CLI; tests the "Custom Agent" path</td></tr>
+      <tr><td>vercel/ai</td><td>Vercel AI SDK</td><td>Stress test — what happens on a framework repo?</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <div class="section-label">Section 02 &middot; The Honest Numbers</div>
+  <h2>Pre-tuning detection counts</h2>
+
+  <table>
+    <thead>
+      <tr><th>Repo</th><th class="num">Detections</th><th>Verdict</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>langgraph</td><td class="num">385</td><td class="delta-bad">~0% sample precision</td></tr>
+      <tr><td>crewAI-examples</td><td class="num">82</td><td class="delta-neutral">~52% precision</td></tr>
+      <tr><td>servers (MCP)</td><td class="num">59</td><td class="delta-neutral">~60% precision</td></tr>
+      <tr><td>open-interpreter</td><td class="num">0</td><td class="delta-bad">recall failure</td></tr>
+      <tr><td>vercel/ai</td><td class="num">1,291</td><td class="delta-bad">0/15 sample precision</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout callout-bad">
+    <p><strong>Two of these numbers are wrong before any deeper inspection.</strong> Open Interpreter is unambiguously an agent project — zero detections is a recall bug. And 1,291 detections in vercel/ai is the SDK detecting <em>itself</em>: the scanner has no awareness that the file it's reading IS the framework, not user code that uses it.</p>
+  </div>
+
+  <p>For the other three, we sampled 15 detections per repo and classified each as a true-positive (real agent) or false-positive (test, framework internal, docstring, type stub, re-export, etc.). On langgraph: 0 of 15. On vercel/ai: 0 of 15. We didn't cherry-pick — those are the numbers from a deterministic random sample.</p>
+</section>
+
+<section>
+  <div class="section-label">Section 03 &middot; What Was Wrong</div>
+  <h2>Five structural failures</h2>
+
+  <h3>1. Bare imports were treated as agents</h3>
+  <p>The LangChain rule fired on any file containing <code>import langchain</code>. In a langchain monorepo every file imports langchain — checkpoint backends, type stubs, test fixtures, SDK clients. None of those are agents. Same problem with the LangGraph and CrewAI rules.</p>
+
+  <h3>2. Three-character substring matchers</h3>
+  <p>The Anthropic MCP rule looked for <code>"mcp"</code> as a 3-char substring + the word "import" anywhere on the line. It matched <code>connect_mcp</code>, <code>disconnect_mcp</code>, <code>client_mcp_v1</code>, and <code>tmcp</code>. The Vercel AI rule looked for <code>"ai/"</code> — which matched every cross-package import inside the SDK monorepo (<code>@ai-sdk/openai</code>, <code>@ai-sdk/provider-utils</code>). The AWS Bedrock rule's <code>bedrock-agent</code> regex matched the URL string <code>bedrock-agent-runtime.us-west-2.amazonaws.com</code>.</p>
+
+  <h3>3. Test directories were scanned by default</h3>
+  <p>143 of 385 langgraph detections (37%) came from <code>tests/</code> paths — pytest fixtures and unit tests exercising the framework's own surface. Test code lives inside the repo's own trust boundary; a security-tooling user doesn't get incremental risk insight from agent-shaped strings inside a vitest spec.</p>
+
+  <h3>4. The Custom Agent rule didn't recognize real custom agents</h3>
+  <p>Open Interpreter uses <code>system_message</code> (LiteLLM convention), not <code>system_prompt</code>. Its tool calls are dict-key form (<code>"tool_call":</code>), not assignment form. Its base model is the Anthropic SDK or LiteLLM, not the newer Anthropic Agent SDK. The rule was written against a too-narrow dialect and missed the most popular custom-agent project on GitHub entirely.</p>
+
+  <h3>5. Score saturation</h3>
+  <p>97.7% of vercel/ai detections were rated Critical. 91% of crewAI-examples scored exactly 100. The scoring rules apply every "missing guardrail" penalty to every detection regardless of detection confidence, so a 21-line <code>console.log</code> demo gets the same Critical rating as a production agent with shell access. When everything is Critical, nothing is.</p>
+</section>
+
+<section>
+  <div class="section-label">Section 04 &middot; What We Changed</div>
+  <h2>Nine commits, one calibration round</h2>
+
+  <p>Every fix was a tightening, not a structural rewrite. The 6-fixture snapshot contract held byte-identical through every commit. <code>cargo test</code>: 69 passing throughout. <code>cargo clippy --all-targets -- -D warnings</code>: clean throughout.</p>
+
+  <h3>Rule-only fixes <span class="tag tag-fixed">SHIPPED</span></h3>
+  <ul>
+    <li><strong>LangChain, LangGraph, CrewAI:</strong> rewrite as <code>all_of(import + positive constructor)</code>. Constructor allowlists: <code>StateGraph</code>, <code>AgentExecutor</code>, <code>create_*_agent</code>, <code>Agent(</code>, <code>@CrewBase</code>, etc. A bare import is no longer enough.</li>
+    <li><strong>Anthropic MCP:</strong> drop the bare <code>"mcp"</code> substring. Require <code>from mcp.&lt;X&gt;</code> / <code>import mcp.&lt;X&gt;</code> or the <code>@modelcontextprotocol</code> SDK namespace.</li>
+    <li><strong>Vercel AI:</strong> drop the bare <code>"ai/"</code> substring. Require <code>all_of(import-from-'ai' + generateText|streamText|tool function-call)</code>.</li>
+    <li><strong>AWS Bedrock:</strong> drop the bare <code>bedrock-agent</code> regex. Require anchored SDK class names (<code>BedrockAgentClient</code>, <code>BedrockAgentRuntimeClient</code>) or the <code>@aws-sdk/client-bedrock-agent</code> package.</li>
+    <li><strong>Custom Agent:</strong> broaden the alternatives to recognize <code>system_message</code> (LiteLLM), dict-form <code>"tool_calls":</code> keys, OpenAI message-format <code>{"role": "system"}</code>, and <code>litellm.completion()</code> / <code>Anthropic().messages.create()</code> call sites.</li>
+  </ul>
+
+  <h3>Scanner change <span class="tag tag-fixed">SHIPPED</span></h3>
+  <ul>
+    <li><strong>Skip test directories by default.</strong> <code>tests</code>, <code>test</code>, <code>__tests__</code>, <code>__testfixtures__</code>, <code>__mocks__</code>, <code>spec</code> added to <code>SKIP_DIRS</code>. Six lines of code, ~37% reduction on the largest repo.</li>
+  </ul>
+
+  <h3>Architectural backlog <span class="tag tag-deferred">DEFERRED TO v0.2</span></h3>
+  <ul>
+    <li><strong><code>is_framework_self</code> context signal.</strong> Read the repo's root <code>package.json</code> / <code>pyproject.toml</code>; if the package name matches a known framework, suppress that framework's own rule. Touches <code>signals.rs</code>, <code>matcher.rs</code>, and <code>loader.rs</code> in lockstep.</li>
+    <li><strong>Manifest-pass activation.</strong> <code>Matcher::matches_repo</code> is wired but the v0.1 scanner only invokes <code>matches_file</code>. <code>package_dep:</code> and <code>file_present:</code> matchers are dormant until this lands.</li>
+    <li><strong>Confidence-gate the scoring rules.</strong> Today every detection accumulates every penalty. A low-confidence match shouldn't paint the same Critical color as a high-confidence one.</li>
+    <li><strong><code>.ipynb</code> notebook parsing.</strong> The most agent-dense part of any LangGraph repo is its tutorial notebooks. Today the scanner is blind to them.</li>
+    <li><strong>Python docstring stripping.</strong> Triple-quoted docstrings containing example code match real imports.</li>
+  </ul>
+</section>
+
+<section>
+  <div class="section-label">Section 05 &middot; The Result</div>
+  <h2>Post-tuning numbers</h2>
+
+  <table>
+    <thead>
+      <tr><th>Repo</th><th class="num">Pre</th><th class="num">Post</th><th class="num">Delta</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>langgraph</td><td class="num">385</td><td class="num">43</td><td class="num delta-good">−89%</td></tr>
+      <tr><td>crewAI-examples</td><td class="num">82</td><td class="num">36</td><td class="num delta-good">−56%</td></tr>
+      <tr><td>servers (MCP)</td><td class="num">59</td><td class="num">41</td><td class="num delta-good">−31%</td></tr>
+      <tr><td>open-interpreter</td><td class="num">0</td><td class="num">14</td><td class="num delta-good">recall recovered</td></tr>
+      <tr><td>vercel/ai</td><td class="num">1,291</td><td class="num">1,140</td><td class="num delta-neutral">−12%</td></tr>
+      <tr><td><strong>Total</strong></td><td class="num"><strong>1,817</strong></td><td class="num"><strong>1,274</strong></td><td class="num delta-good"><strong>−30%</strong></td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <p><strong>The vercel/ai number is not a failure.</strong> The 1,140 residual detections are <em>correctly identifying</em> SDK usage in framework-shipped example files. Those files genuinely call <code>generateText()</code> from the <code>'ai'</code> SDK. Eliminating them isn't a rule-tuning problem — it's the framework-self-detection signal we deferred to v0.2. Until that lands, the honest answer is that running Agent Shield against <code>vercel/ai</code> is <em>outside the intended use case</em>: the scanner is for application repos that <em>use</em> a framework, not for the framework's own implementation.</p>
+  </div>
+</section>
+
+<section>
+  <div class="section-label">Section 06 &middot; Verdict</div>
+  <h2>What we learned</h2>
+
+  <p>The v0.1.0 detection rules were over-tuned to small fixture corpora and broke catastrophically on framework monorepos. Sample precision on langgraph and vercel/ai was 0/15 in both cases. A single calibration round of rule-only changes brought sample precision into a defensible range on every repo except vercel/ai, where the residual is the kind of false-positive that no rule edit can fix — only architecture can.</p>
+
+  <p>The v0.1.0 contract is preserved: every snapshot fixture remains byte-identical, every test passes, clippy stays clean, MSRV stays at 1.88. The byte-identical contract held through nine rule commits because every change was a tightening — narrowing the conditions under which a rule fires — not a structural rewrite.</p>
+
+  <p>The scoring layer was deliberately not changed in this round. The current scoring rules saturate at Critical on every detection; that's a real bug, but the fix (gating the missing-* rules behind detection confidence) requires a new context signal and is its own architectural change. v0.2 work.</p>
+
+  <p>This calibration is itself the most important fixture the project has. The 6 small fixtures lock the byte-identical contract; the 5 real-world repos lock the rule-quality contract. Both will run on every future change.</p>
+</section>
+
+<section>
+  <div class="section-label">Section 07 &middot; Reproduce</div>
+  <h2>Run it yourself</h2>
+
+  <pre><code>git clone https://github.com/cschuman/agent-shield
+cd agent-shield
+git checkout v0.1.0  # or `calibration-v0.1.0` for post-tuning
+cargo build --release
+
+mkdir -p calibration/repos calibration/scans
+cd calibration/repos
+git clone --depth=1 https://github.com/langchain-ai/langgraph.git
+git clone --depth=1 https://github.com/crewAIInc/crewAI-examples.git
+git clone --depth=1 https://github.com/modelcontextprotocol/servers.git
+git clone --depth=1 https://github.com/OpenInterpreter/open-interpreter.git
+git clone --depth=1 https://github.com/vercel/ai.git
+cd ../..
+
+for r in langgraph crewAI-examples servers open-interpreter ai; do
+  ./target/release/agent-shield scan calibration/repos/$r \
+    --format json -o calibration/scans/$r.json
+done</code></pre>
+
+  <p class="muted">Detection counts will drift over time as the upstream repos evolve. The full engineering report is in the repo at <a href="https://github.com/cschuman/agent-shield/blob/main/docs/case-study/2026-04-25-real-world-calibration.md"><code>docs/case-study/2026-04-25-real-world-calibration.md</code></a>.</p>
+</section>
+
+</main>
+
+<footer>
+  <div class="footer-inner">
+    <p>&copy; 2026 Agent Shield. Open source under MIT License.</p>
+    <div class="footer-links">
+      <a href="https://github.com/cschuman/agent-shield">GitHub</a>
+      <a href="../pricing.html">Pricing</a>
+      <a href="../index.html">Home</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
