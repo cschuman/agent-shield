@@ -11,6 +11,7 @@
 pub mod matcher;
 
 use crate::frameworks::AgentFramework;
+use crate::rules::types::{Compliance, ParsedSeverity};
 use matcher::Matcher;
 
 /// A single compiled detection rule.
@@ -38,10 +39,42 @@ pub struct CompiledRule {
     pub extends: Option<String>,
 }
 
+/// A single compiled scoring rule (Tier-2). Differs from `CompiledRule`
+/// in that it carries finding-emission metadata: title/description templates,
+/// severity, and per-framework compliance references. The `matcher` for a
+/// scoring rule must evaluate against `ContextSignals` only — file/repo
+/// primitives are loader-rejected so a scoring rule can never produce a
+/// silently-empty match (which would happen if it tried to read the source
+/// tree, since scoring runs after scanning is done).
+#[derive(Debug, Clone)]
+pub struct CompiledScoringRule {
+    pub id: String,
+    /// Snake_case category from the YAML, e.g. `prompt_injection_risk`.
+    /// `scoring.rs::materialize_finding` maps this to `FindingCategory`.
+    pub category: String,
+    pub severity: ParsedSeverity,
+    /// Optional title — when absent, the rule is a "silent" score
+    /// adjustment that does not push a `Finding`. `empty-tools.yaml` is
+    /// the only example today.
+    pub title: Option<String>,
+    pub description: String,
+    pub remediation: Option<String>,
+    pub matcher: Matcher,
+    pub score_adjustment: i32,
+    pub compliance: Compliance,
+    pub extends: Option<String>,
+}
+
 /// A bundle of compiled rules ready for evaluation.
+///
+/// Detection rules drive the file/repo scan in `scanner.rs`; scoring rules
+/// drive finding emission in `scoring.rs::score_single_agent`. Both vecs
+/// preserve YAML-load order, which is the source-order invariant that
+/// keeps JSON output byte-identical across scanner runs.
 #[derive(Debug, Clone, Default)]
 pub struct CompiledRuleSet {
     pub rules: Vec<CompiledRule>,
+    pub scoring_rules: Vec<CompiledScoringRule>,
 }
 
 impl CompiledRuleSet {
@@ -65,6 +98,17 @@ impl Engine {
         Self::default()
     }
 
+    /// Iterate detection rules in source order.
+    pub fn detection_rules(&self) -> &[CompiledRule] {
+        &self.rules.rules
+    }
+
+    /// Iterate scoring rules in source order. Order is the C8 finding-emit
+    /// invariant — `scoring.rs::score_single_agent` consumes this directly.
+    pub fn scoring_rules(&self) -> &[CompiledScoringRule] {
+        &self.rules.scoring_rules
+    }
+
     /// Compile the built-in detection rules.
     ///
     /// One `CompiledRule` per `AgentFramework` variant. Each rule's matcher
@@ -77,12 +121,12 @@ impl Engine {
     /// hits, so the legacy "Import + CodePattern only contribute to firing"
     /// behavior is preserved exactly.
     ///
-    /// As of W2-C5 this is a thin wrapper over `compile_yaml(EMBEDDED_DETECTION_RULES)`.
+    /// As of W2-C5 this is a thin wrapper over `compile_yaml(EMBEDDED_RULES)`.
     /// The hardcoded matcher tree is gone; rule definitions live in
-    /// `rules/builtin/*.yaml`. Adding a framework now means: enum variant
-    /// + YAML file + EMBEDDED_DETECTION_RULES entry.
+    /// `rules/builtin/*.yaml` (detection) and `rules/scoring/*.yaml` (scoring).
+    /// Adding a framework now means: enum variant + YAML file + EMBEDDED_RULES entry.
     pub fn compile_builtin() -> Self {
-        Self::compile_yaml(EMBEDDED_DETECTION_RULES)
+        Self::compile_yaml(EMBEDDED_RULES)
     }
 
     /// Compile from a bundle of `(source_key, yaml_text)` pairs.
@@ -111,23 +155,36 @@ impl Engine {
     pub fn compile_yaml_with_diagnostics(
         bundle: &[(&str, &str)],
     ) -> (Self, Vec<crate::rules::loader::RuleDiagnostic>) {
-        let (rules, diags) = crate::rules::loader::parse_bundle(bundle);
+        let parsed = crate::rules::loader::parse_bundle(bundle);
         (
             Self {
-                rules: CompiledRuleSet { rules },
+                rules: CompiledRuleSet {
+                    rules: parsed.detection,
+                    scoring_rules: parsed.scoring,
+                },
             },
-            diags,
+            parsed.diagnostics,
         )
     }
 }
 
-/// Bundled detection rules — concatenated at build time via `include_str!`.
+/// Bundled rules — both detection (Tier-1) and scoring (Tier-2),
+/// concatenated at build time via `include_str!`.
 ///
-/// Order matches the variant order of `AgentFramework::all()` so users
-/// reading rule IDs can predict scan output without grepping a slug map.
-/// When adding a framework: add the variant to `AgentFramework`, the YAML
-/// file to `rules/builtin/`, and a new entry here in the same position.
-pub const EMBEDDED_DETECTION_RULES: &[(&str, &str)] = &[
+/// **Ordering invariants:**
+/// - Detection rules: order matches `AgentFramework::all()` so users
+///   reading rule IDs can predict scan output without grepping a slug map.
+/// - Scoring rules: order matches the firing order of the legacy inline
+///   findings in `scoring.rs::score_single_agent` (W1 baseline). This is
+///   the byte-identical contract — JSON output preserves finding emission
+///   order, which is rule-load order. Re-arrange this list and you will
+///   break snapshot tests.
+///
+/// When adding a framework: enum variant + `rules/builtin/<slug>.yaml` +
+/// new detection entry here. When adding a scoring rule: write the YAML +
+/// add an entry in the firing-order position.
+pub const EMBEDDED_RULES: &[(&str, &str)] = &[
+    // ===== Detection rules (Tier-1) =====
     ("langchain", include_str!("../../rules/builtin/langchain.yaml")),
     ("langgraph", include_str!("../../rules/builtin/langgraph.yaml")),
     ("crewai", include_str!("../../rules/builtin/crewai.yaml")),
@@ -152,6 +209,62 @@ pub const EMBEDDED_DETECTION_RULES: &[(&str, &str)] = &[
     (
         "custom-agent",
         include_str!("../../rules/builtin/custom-agent.yaml"),
+    ),
+    // ===== Scoring rules (Tier-2), in legacy firing order =====
+    // 1. Tool count == 0 → silent +5
+    (
+        "scoring/empty-tools",
+        include_str!("../../rules/scoring/empty-tools.yaml"),
+    ),
+    // 2. Tool count > 10 → +15 + UnboundedAutonomy finding
+    (
+        "scoring/unbounded-tools",
+        include_str!("../../rules/scoring/unbounded-tools.yaml"),
+    ),
+    // 3. Unconfirmed tools && tool_count > 3 → +10 + NoHumanOversight finding
+    (
+        "scoring/unconfirmed-tools",
+        include_str!("../../rules/scoring/unconfirmed-tools.yaml"),
+    ),
+    // 4. !has_system_prompt → +10 + PromptInjectionRisk finding
+    (
+        "scoring/missing-system-prompt",
+        include_str!("../../rules/scoring/missing-system-prompt.yaml"),
+    ),
+    // 5. !input_validation → +10 + MissingGuardrail/High finding
+    (
+        "scoring/missing-input-validation",
+        include_str!("../../rules/scoring/missing-input-validation.yaml"),
+    ),
+    // 6. !output_filtering → +5 + MissingGuardrail/Medium finding
+    (
+        "scoring/missing-output-filter",
+        include_str!("../../rules/scoring/missing-output-filter.yaml"),
+    ),
+    // 7. !rate_limit → +5 + MissingGuardrail/Low finding
+    (
+        "scoring/missing-rate-limit",
+        include_str!("../../rules/scoring/missing-rate-limit.yaml"),
+    ),
+    // 8. has_exec → +20 + ExcessivePermission/Critical finding
+    (
+        "scoring/excessive-exec-permission",
+        include_str!("../../rules/scoring/excessive-exec-permission.yaml"),
+    ),
+    // 9. has_admin → +15 + ExcessivePermission/Critical finding
+    (
+        "scoring/excessive-admin-permission",
+        include_str!("../../rules/scoring/excessive-admin-permission.yaml"),
+    ),
+    // 10. data_source_count > 3 → +10 + DataExposure/Medium finding
+    (
+        "scoring/data-access-broad",
+        include_str!("../../rules/scoring/data-access-broad.yaml"),
+    ),
+    // 11. !has_audit_trail → +5 + MissingAuditTrail finding
+    (
+        "scoring/missing-audit-trail",
+        include_str!("../../rules/scoring/missing-audit-trail.yaml"),
     ),
 ];
 
@@ -235,13 +348,22 @@ mod tests {
     /// The YAML bundle must compile cleanly with zero diagnostics.
     #[test]
     fn embedded_yaml_loads_without_diagnostics() {
-        let (engine, diags) = Engine::compile_yaml_with_diagnostics(EMBEDDED_DETECTION_RULES);
+        let (engine, diags) = Engine::compile_yaml_with_diagnostics(EMBEDDED_RULES);
         assert!(
             diags.is_empty(),
             "expected zero diagnostics, got: {:#?}",
             diags
         );
-        assert_eq!(engine.rules.rules.len(), AgentFramework::all().len());
+        assert_eq!(
+            engine.detection_rules().len(),
+            AgentFramework::all().len(),
+            "one detection rule per framework"
+        );
+        assert_eq!(
+            engine.scoring_rules().len(),
+            11,
+            "11 scoring rules — one per legacy inline finding plus the empty-tools silent bump"
+        );
     }
 
 }

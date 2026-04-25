@@ -25,10 +25,10 @@
 //! reserved for JSON scan output.
 
 use crate::engine::matcher::{LangSet, Matcher, SignalOp, SignalValue};
-use crate::engine::CompiledRule;
+use crate::engine::{CompiledRule, CompiledScoringRule};
 use crate::frameworks::AgentFramework;
 use crate::rules::types::{
-    ParsedContextSignal, ParsedMatcher, ParsedRule, ParsedSignalOp, ParsedSignalValue,
+    Compliance, ParsedContextSignal, ParsedMatcher, ParsedRule, ParsedSignalOp, ParsedSignalValue,
 };
 use regex::Regex;
 
@@ -54,23 +54,37 @@ impl RuleDiagnostic {
     }
 }
 
-/// Parse a bundle of `(source_key, yaml_text)` pairs into compiled rules
-/// plus diagnostics. Both lists are returned regardless of how many rules
-/// failed — the caller decides whether to fail the build (tests) or print
-/// and continue (binary).
-pub fn parse_bundle(bundle: &[(&str, &str)]) -> (Vec<CompiledRule>, Vec<RuleDiagnostic>) {
-    let mut compiled = Vec::with_capacity(bundle.len());
-    let mut diags = Vec::new();
-    for (source, content) in bundle {
-        match parse_one(source, content) {
-            Ok(rule) => compiled.push(rule),
-            Err(d) => diags.push(d),
-        }
-    }
-    (compiled, diags)
+/// One successfully-parsed rule, dispatched by category. Detection rules
+/// drive the scanner; scoring rules drive finding emission.
+#[derive(Debug)]
+enum ParsedOne {
+    Detection(CompiledRule),
+    Scoring(CompiledScoringRule),
 }
 
-fn parse_one(source: &str, content: &str) -> Result<CompiledRule, RuleDiagnostic> {
+/// Result of parsing a bundle. `detection` and `scoring` preserve source
+/// order; `diagnostics` collects every quarantined rule.
+#[derive(Debug, Default)]
+pub struct ParsedBundle {
+    pub detection: Vec<CompiledRule>,
+    pub scoring: Vec<CompiledScoringRule>,
+    pub diagnostics: Vec<RuleDiagnostic>,
+}
+
+/// Parse a bundle of `(source_key, yaml_text)` pairs.
+pub fn parse_bundle(bundle: &[(&str, &str)]) -> ParsedBundle {
+    let mut out = ParsedBundle::default();
+    for (source, content) in bundle {
+        match parse_one(source, content) {
+            Ok(ParsedOne::Detection(r)) => out.detection.push(r),
+            Ok(ParsedOne::Scoring(r)) => out.scoring.push(r),
+            Err(d) => out.diagnostics.push(d),
+        }
+    }
+    out
+}
+
+fn parse_one(source: &str, content: &str) -> Result<ParsedOne, RuleDiagnostic> {
     let parsed: ParsedRule = serde_yaml::from_str(content)
         .map_err(|e| RuleDiagnostic::new(source, None, format!("YAML parse error: {}", e)))?;
 
@@ -93,21 +107,118 @@ fn parse_one(source: &str, content: &str) -> Result<CompiledRule, RuleDiagnostic
         ));
     }
 
-    match parsed.category.as_str() {
-        "detection" => translate_detection(source, parsed),
-        // Scoring categories are recognized in W2-C7. For C4–C5 we keep
-        // detection-only and reject everything else so the parse-equivalence
-        // test against compile_builtin stays honest.
-        other => Err(RuleDiagnostic::new(
+    if parsed.category == "detection" {
+        translate_detection(source, parsed).map(ParsedOne::Detection)
+    } else {
+        translate_scoring(source, parsed).map(ParsedOne::Scoring)
+    }
+}
+
+fn translate_scoring(
+    source: &str,
+    parsed: ParsedRule,
+) -> Result<CompiledScoringRule, RuleDiagnostic> {
+    let id = parsed.id.clone();
+
+    if parsed.framework.is_some() {
+        return Err(RuleDiagnostic::new(
             source,
-            Some(&parsed.id),
-            format!("unsupported category `{}` (W2-C4 handles `detection` only)", other),
-        )),
+            Some(&id),
+            "scoring rules must not declare `framework` — that field is detection-only",
+        ));
+    }
+    if parsed.min_match_count.is_some() {
+        return Err(RuleDiagnostic::new(
+            source,
+            Some(&id),
+            "scoring rules must not declare `min_match_count` — they fire on signal match",
+        ));
+    }
+    let score_adjustment = parsed.score_adjustment.ok_or_else(|| {
+        RuleDiagnostic::new(
+            source,
+            Some(&id),
+            "scoring rules must declare `score_adjustment`",
+        )
+    })?;
+
+    // Title is optional (silent score-bump rules like empty-tools have none),
+    // but if title is present, remediation+compliance must also be present —
+    // otherwise the rendered Finding would be incomplete.
+    if parsed.title.is_some() {
+        if parsed.remediation.is_none() {
+            return Err(RuleDiagnostic::new(
+                source,
+                Some(&id),
+                "rule has `title` but no `remediation` — finding would be incomplete",
+            ));
+        }
+        if parsed.compliance.is_none() {
+            return Err(RuleDiagnostic::new(
+                source,
+                Some(&id),
+                "rule has `title` but no `compliance` block — cannot map to user --framework",
+            ));
+        }
+    }
+
+    let matcher = translate_matcher(source, &id, &parsed.when)?;
+    if !is_signal_only(&matcher) {
+        return Err(RuleDiagnostic::new(
+            source,
+            Some(&id),
+            "scoring rules must reference only context signals (no file/repo primitives)",
+        ));
+    }
+
+    Ok(CompiledScoringRule {
+        id,
+        category: parsed.category,
+        severity: parsed.severity,
+        title: parsed.title,
+        description: parsed.description,
+        remediation: parsed.remediation,
+        matcher,
+        score_adjustment,
+        compliance: parsed.compliance.unwrap_or_else(Compliance::default),
+        extends: None,
+    })
+}
+
+/// Recursively check that a matcher tree only contains `ContextSignal`
+/// leaves (with `AllOf`/`AnyOf`/`Not` combinators). File/repo primitives
+/// would silently never fire under `matches_signals`, so we reject them
+/// at load time as a likely authoring error.
+fn is_signal_only(m: &Matcher) -> bool {
+    match m {
+        Matcher::ContextSignal { .. } => true,
+        Matcher::AllOf(children) | Matcher::AnyOf(children) => {
+            children.iter().all(is_signal_only)
+        }
+        Matcher::Not(inner) => is_signal_only(inner),
+        Matcher::ImportContains { .. }
+        | Matcher::CodeRegex { .. }
+        | Matcher::MultilineRegex { .. }
+        | Matcher::PackageDep { .. }
+        | Matcher::FilePresent { .. } => false,
     }
 }
 
 fn translate_detection(source: &str, parsed: ParsedRule) -> Result<CompiledRule, RuleDiagnostic> {
     let id = parsed.id.clone();
+
+    if parsed.title.is_some()
+        || parsed.remediation.is_some()
+        || parsed.score_adjustment.is_some()
+        || parsed.compliance.is_some()
+    {
+        return Err(RuleDiagnostic::new(
+            source,
+            Some(&id),
+            "detection rules must not declare title/remediation/score_adjustment/compliance — those fields are scoring-only",
+        ));
+    }
+
     let framework_name = parsed.framework.as_deref().ok_or_else(|| {
         RuleDiagnostic::new(source, Some(&id), "detection rules must declare `framework`")
     })?;
@@ -334,8 +445,22 @@ fn allowlist_help() -> &'static str {
 mod tests {
     use super::*;
 
-    fn one(yaml: &str) -> Result<CompiledRule, RuleDiagnostic> {
+    fn one(yaml: &str) -> Result<ParsedOne, RuleDiagnostic> {
         parse_one("test", yaml)
+    }
+
+    fn one_detection(yaml: &str) -> Result<CompiledRule, RuleDiagnostic> {
+        match one(yaml)? {
+            ParsedOne::Detection(r) => Ok(r),
+            ParsedOne::Scoring(_) => panic!("expected detection rule"),
+        }
+    }
+
+    fn one_scoring(yaml: &str) -> Result<CompiledScoringRule, RuleDiagnostic> {
+        match one(yaml)? {
+            ParsedOne::Scoring(r) => Ok(r),
+            ParsedOne::Detection(_) => panic!("expected scoring rule"),
+        }
     }
 
     #[test]
@@ -352,11 +477,124 @@ when:
     - import_contains: "langchain"
     - package_dep: "langchain"
 "#;
-        let rule = one(yaml).expect("must parse");
+        let rule = one_detection(yaml).expect("must parse");
         assert_eq!(rule.id, "x");
         assert_eq!(rule.framework, AgentFramework::LangChain);
         assert_eq!(rule.min_match_count, 1);
         assert!(matches!(rule.matcher, Matcher::AnyOf(ref c) if c.len() == 2));
+    }
+
+    #[test]
+    fn scoring_rule_round_trips() {
+        let yaml = r#"
+schema_version: "1.0"
+id: "scoring/missing-system-prompt"
+category: prompt_injection_risk
+severity: medium
+description: "x"
+title: "x"
+remediation: "x"
+score_adjustment: 10
+when:
+  context_signal:
+    name: has_system_prompt
+    op: eq
+    value: false
+compliance:
+  nist_ai_rmf:   ["x"]
+  iso_42001:     ["y"]
+  eu_ai_act:     ["z"]
+  owasp_agentic: ["w"]
+"#;
+        let rule = one_scoring(yaml).expect("must parse");
+        assert_eq!(rule.id, "scoring/missing-system-prompt");
+        assert_eq!(rule.score_adjustment, 10);
+        assert!(matches!(rule.matcher, Matcher::ContextSignal { .. }));
+    }
+
+    #[test]
+    fn rejects_scoring_rule_with_file_primitive() {
+        let yaml = r#"
+schema_version: "1.0"
+id: "bad"
+category: missing_guardrail
+severity: high
+description: "x"
+title: "x"
+remediation: "x"
+score_adjustment: 10
+when:
+  import_contains: "langchain"
+compliance:
+  nist_ai_rmf:   ["a"]
+  iso_42001:     ["b"]
+  eu_ai_act:     ["c"]
+  owasp_agentic: ["d"]
+"#;
+        let err = one(yaml).expect_err("must reject");
+        assert!(err.message.contains("only context signals"));
+    }
+
+    #[test]
+    fn rejects_detection_rule_with_scoring_field() {
+        let yaml = r#"
+schema_version: "1.0"
+id: "x"
+category: detection
+severity: high
+description: "x"
+framework: LangChain
+score_adjustment: 5
+when:
+  import_contains: "langchain"
+"#;
+        let err = one(yaml).expect_err("must reject");
+        assert!(err.message.contains("scoring-only"));
+    }
+
+    #[test]
+    fn rejects_scoring_rule_missing_score_adjustment() {
+        let yaml = r#"
+schema_version: "1.0"
+id: "bad"
+category: missing_guardrail
+severity: high
+description: "x"
+title: "x"
+remediation: "x"
+when:
+  context_signal:
+    name: has_system_prompt
+    op: eq
+    value: false
+compliance:
+  nist_ai_rmf:   ["a"]
+  iso_42001:     ["b"]
+  eu_ai_act:     ["c"]
+  owasp_agentic: ["d"]
+"#;
+        let err = one(yaml).expect_err("must reject");
+        assert!(err.message.contains("score_adjustment"));
+    }
+
+    #[test]
+    fn rejects_partial_finding_metadata() {
+        let yaml = r#"
+schema_version: "1.0"
+id: "bad"
+category: missing_guardrail
+severity: high
+description: "x"
+title: "x"
+score_adjustment: 5
+when:
+  context_signal:
+    name: has_system_prompt
+    op: eq
+    value: false
+"#;
+        let err = one(yaml).expect_err("must reject");
+        assert!(err.message.contains("remediation"));
     }
 
     #[test]
@@ -497,11 +735,12 @@ framework: LangChain
 when:
   import_contains: "x"
 "#;
-        let (rules, diags) = parse_bundle(&[("g", good), ("b", bad)]);
-        assert_eq!(rules.len(), 1, "good rule loaded");
-        assert_eq!(diags.len(), 1, "bad rule quarantined");
-        assert_eq!(rules[0].id, "good");
-        assert_eq!(diags[0].rule_id.as_deref(), Some("bad"));
+        let parsed = parse_bundle(&[("g", good), ("b", bad)]);
+        assert_eq!(parsed.detection.len(), 1, "good rule loaded");
+        assert_eq!(parsed.scoring.len(), 0, "no scoring rules in fixture");
+        assert_eq!(parsed.diagnostics.len(), 1, "bad rule quarantined");
+        assert_eq!(parsed.detection[0].id, "good");
+        assert_eq!(parsed.diagnostics[0].rule_id.as_deref(), Some("bad"));
     }
 
     #[test]
