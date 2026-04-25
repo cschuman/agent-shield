@@ -182,7 +182,7 @@ definitions (the residual 1 is a LangGraph match in a related sub-tree).
 **Result:** 59 → 41. Tool-count recall fix and lockfile-skip are deferred
 to v0.2.
 
-### OpenInterpreter/open-interpreter (0 → 14, **recall recovered**)
+### OpenInterpreter/open-interpreter (0 → 15, **recall recovered**)
 
 A canonical custom agent project returning **zero detections** is
 unambiguously a scanner bug. Five root causes from the assessment:
@@ -205,11 +205,20 @@ unambiguously a scanner bug. Five root causes from the assessment:
   - `system_message` / `systemMessage` (LiteLLM dialect)
   - dict-form `"tool_call":` and `"tool_calls":` keys
   - OpenAI message format `{"role": "system"}`
-  - `litellm.completion()` and `Anthropic().messages.create()` call sites
+  - `litellm.completion()` call sites
   - `agent.{loop,run,execute,step,chat}(` invocation patterns
+  - `import anthropic` / `from anthropic` plus `.messages.create(` call
+    shapes — the original single regex `Anthropic().messages.create(`
+    only caught the inline-chained form and silently missed the
+    canonical `client = Anthropic(...); client.messages.create(...)`
+    idiom (caught in PR review). Splitting into two narrower signals
+    that both feed `min_match_count: 2` recovered detection of the
+    `computer_use/loop.py` Anthropic-SDK agent loop.
 
-**Result:** 0 → 14 detections. Recall recovered. Items 4 (manifest pass)
-and 5 (Anthropic Agent SDK base-SDK extension) deferred to v0.2.
+**Result:** 0 → 15 detections. Recall recovered. Items 4 (manifest pass)
+and 5 (dedicated Anthropic Agent SDK rule for the newer Agent SDK) are
+deferred to v0.2 — base-SDK detection now flows through the Custom Agent
+rule's broadened patterns.
 
 ### vercel/ai (1,291 → 1,140, **12% reduction**)
 
@@ -278,9 +287,9 @@ auto-detect framework repos and refuse / warn.
 | langgraph | 385 | 43 | **−89%** |
 | crewAI-examples | 82 | 36 | **−56%** |
 | servers (MCP) | 59 | 41 | **−31%** |
-| open-interpreter | 0 | 14 | **recall recovered** |
+| open-interpreter | 0 | 15 | **recall recovered** |
 | vercel/ai | 1,291 | 1,140 | −12% |
-| **Total** | **1,817** | **1,274** | **−30%** |
+| **Total** | **1,817** | **1,275** | **−30%** |
 
 ### Cross-cutting themes
 

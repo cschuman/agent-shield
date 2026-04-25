@@ -27,4 +27,13 @@ when:
     - code_regex: '["'']role["'']\s*:\s*["'']system["'']'
     - code_regex: 'agent[_.](?:loop|run|execute|step|chat)\s*\('
     - code_regex: '\b(?:litellm|completion)\s*\.\s*completion\s*\('
-    - code_regex: '\bAnthropic\s*\(\s*\)\.messages\.create\s*\('
+    # Anthropic base-SDK detection. The original single regex
+    # `Anthropic().messages.create(` only matched the inline-chained form
+    # and missed the canonical `client = Anthropic(...); client.messages.create(...)`
+    # idiom. Replace with two narrower signals: an explicit `anthropic`
+    # package import (Anthropic-specific) and a `.messages.create(` call
+    # shape. Both contribute to min_match_count: 2, so neither fires the
+    # rule on its own — files need an Anthropic anchor AND a call site (or
+    # one of these plus another agent signal) to qualify.
+    - code_regex: '^\s*(?:from|import)\s+anthropic\b'
+    - code_regex: '\.\s*messages\s*\.\s*create\s*\('
