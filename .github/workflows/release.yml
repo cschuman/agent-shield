@@ -77,7 +77,7 @@ jobs:
         run: tar -czf "${stage}.tar.gz" "${stage}"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.stage }}
           path: dist/${{ env.stage }}.tar.gz
