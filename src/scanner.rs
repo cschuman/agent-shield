@@ -132,7 +132,7 @@ pub fn scan_directory(path: &Path) -> Result<Vec<DiscoveredAgent>, Box<dyn std::
             content: &content,
         };
 
-        for rule in &engine.rules.rules {
+        for rule in engine.detection_rules() {
             let hits = rule.matcher.matches_file(&ctx);
             if hits.len() >= rule.min_match_count as usize {
                 let raw_matches: Vec<(usize, String)> =
@@ -209,7 +209,7 @@ fn extract_agent_details(
     }
 }
 
-fn extract_agent_name(content: &str, framework: &AgentFramework) -> Option<String> {
+fn extract_agent_name(content: &str, _framework: &AgentFramework) -> Option<String> {
     // Framework-specific naming patterns first
     let name_patterns = [
         r#"agent_name\s*[=:]\s*["']([^"']+)["']"#,

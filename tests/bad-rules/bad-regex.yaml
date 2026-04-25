@@ -6,5 +6,5 @@ severity: high
 description: "regex with unclosed group — must fail to compile"
 when:
   any_of:
-    - { code_pattern: "(unclosed" }
+    - { code_regex: "(unclosed" }
 extends: null

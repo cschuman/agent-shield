@@ -39,6 +39,10 @@ pub enum Lang {
 #[derive(Debug, Clone)]
 pub enum LangSet {
     Any,
+    /// Reserved for v1.1 — `languages:` is not yet a YAML matcher field, so
+    /// no rule today translates to this variant. Wired up so the evaluator
+    /// is ready when the schema lands.
+    #[allow(dead_code)]
     Only(Vec<Lang>),
 }
 
@@ -63,12 +67,19 @@ pub struct MatchHit {
 
 /// File-level evaluation context.
 pub struct FileCtx<'a> {
+    /// Reserved for matchers that key on path (e.g. `path_glob:`); not yet
+    /// consumed by any v1.0 primitive.
+    #[allow(dead_code)]
     pub path: &'a Path,
     pub lang: Lang,
     pub content: &'a str,
 }
 
-/// Repo-level evaluation context — used by manifest and file-presence matchers.
+/// Repo-level evaluation context — used by manifest and file-presence
+/// matchers. Constructed by the W3 manifest pass; in v1.0 the scanner
+/// only invokes `matches_file`, so `package_dep:` / `file_present:`
+/// matchers in YAML are dormant. Tracked under the W3 scanner refactor.
+#[allow(dead_code)]
 pub struct RepoCtx<'a> {
     pub root: &'a Path,
     /// Concatenated content of every manifest discovered at the repo root
@@ -248,6 +259,10 @@ impl Matcher {
 
     /// Evaluate against the repo as a whole. File-level variants
     /// (`ImportContains`, `CodeRegex`, `MultilineRegex`) return an empty `Vec`.
+    /// Currently dormant — the v1.0 scanner walks files only. Scheduled for
+    /// W3 once the manifest pass returns; until then `package_dep:` and
+    /// `file_present:` matchers in YAML never fire.
+    #[allow(dead_code)]
     pub fn matches_repo(&self, ctx: &RepoCtx) -> Vec<MatchHit> {
         match self {
             Matcher::PackageDep { name } => {

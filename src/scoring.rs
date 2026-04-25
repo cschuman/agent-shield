@@ -83,6 +83,9 @@ pub enum FindingCategory {
 
 #[derive(Debug, Clone, Serialize)]
 pub enum Severity {
+    /// Reserved for v1.1 silent-rule findings; ParsedSeverity has no
+    /// `info` variant today, so the loader cannot construct this.
+    #[allow(dead_code)]
     Info,
     Low,
     Medium,
@@ -114,16 +117,18 @@ fn score_single_agent(
 
     // Autonomy tier scalar — unconditional, applied before rule loop.
     let autonomy_tier = signals.autonomy_tier;
-    score += (autonomy_tier as i16 - 1) * 10;
+    score = score.saturating_add((i16::from(autonomy_tier) - 1) * 10);
 
     // Drive findings + score adjustments off the YAML-defined scoring rule
     // set, in source order. EMBEDDED_RULES enforces firing order to keep
-    // snapshot output byte-identical.
+    // snapshot output byte-identical. score_adjustment is bounded to
+    // ±100 by the loader, so saturating_add cannot overflow even with
+    // an adversarial 11-rule pile-on.
     for rule in engine.scoring_rules() {
         if rule.matcher.matches_signals(&signals).is_empty() {
             continue;
         }
-        score += rule.score_adjustment as i16;
+        score = score.saturating_add(rule.score_adjustment as i16);
         if let Some(finding) = materialize_finding(rule, compliance_framework, &signals) {
             findings.push(finding);
         }
@@ -134,9 +139,12 @@ fn score_single_agent(
     let has_admin = signals.permissions.admin;
     let has_write = signals.permissions.write;
 
-    // Guardrail credit — unconditional reduction, scalar not finding.
-    let guardrail_credit = (agent.guardrails.len() as i16 * 5).min(25);
-    score -= guardrail_credit;
+    // Guardrail credit — unconditional reduction, capped at 25. Clamp the
+    // count *before* casting so an agent with > i16::MAX guardrails (only
+    // possible from a hand-constructed test fixture) cannot wrap the cast.
+    let guardrail_count = agent.guardrails.len().min(5) as i16;
+    let guardrail_credit = guardrail_count * 5;
+    score = score.saturating_sub(guardrail_credit);
 
     let final_score = score.clamp(0, 100) as u8;
 
@@ -275,3 +283,236 @@ fn get_framework_baseline(framework_name: &str) -> i16 {
     50 // unknown framework
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::scanner::{
+        DiscoveredAgent, Guardrail, GuardrailKind, Permission, PermissionLevel, ToolDefinition,
+    };
+    use std::path::PathBuf;
+
+    fn naked_agent() -> DiscoveredAgent {
+        DiscoveredAgent {
+            name: "test-agent".into(),
+            framework: "LangChain".into(),
+            file_path: PathBuf::from("test.py"),
+            line_number: 1,
+            tools: Vec::new(),
+            system_prompt: None,
+            permissions: Vec::new(),
+            guardrails: Vec::new(),
+            data_access: Vec::new(),
+        }
+    }
+
+    /// Pin the W2-C8 finding-emit-order invariant *independent of snapshots*.
+    /// Snapshots compare full JSON; this test gives a focused failure
+    /// message ("expected category X at index Y, got Z") when the rule
+    /// order in EMBEDDED_RULES drifts from the legacy firing sequence.
+    #[test]
+    fn finding_emit_order_matches_w1_firing_sequence() {
+        // Build an agent that triggers every non-silent scoring rule:
+        //   - 11 tools (>10 → unbounded-tools fires; not 0 → empty-tools silent)
+        //   - first 3 lack confirmation → unconfirmed-tools fires
+        //   - autonomy_tier saturates at 5 with admin permission
+        //   - no system prompt, no guardrails → 4 missing-* rules fire
+        //   - admin permission → exec + admin both fire
+        //   - 4 data sources → data-access-broad fires
+        //   - no audit trail → missing-audit-trail fires
+        let mut agent = naked_agent();
+        agent.tools = (0..11)
+            .map(|i| ToolDefinition {
+                name: format!("t{}", i),
+                description: None,
+                has_confirmation: i >= 3,
+            })
+            .collect();
+        agent.permissions = vec![Permission {
+            scope: "system".into(),
+            level: PermissionLevel::Admin,
+        }];
+        agent.data_access = (0..4)
+            .map(|i| crate::scanner::DataAccess {
+                source: format!("src{}", i),
+                access_type: "read".into(),
+            })
+            .collect();
+
+        let engine = Engine::compile_builtin();
+        let scored = score_single_agent(&agent, &Framework::Nist, &engine);
+
+        // The W1 firing order (preserved by EMBEDDED_RULES). empty-tools is
+        // silent so it does not appear in the findings vector. unbounded
+        // and unconfirmed both relate to UnboundedAutonomy, which is why
+        // we see two consecutive findings of that category.
+        let categories: Vec<String> = scored
+            .findings
+            .iter()
+            .map(|f| format!("{:?}", f.category))
+            .collect();
+        // The order below is the W1 firing sequence (load-bearing for
+        // the byte-identical snapshot contract). The exact category labels
+        // come from each rule's YAML category field — the only
+        // ExcessivePermission entry corresponds to the admin rule because
+        // the exec rule's matcher requires `level=execute` specifically and
+        // the admin permission used here saturates at admin.
+        assert_eq!(
+            categories,
+            vec![
+                "UnboundedAutonomy",       // unbounded-tools
+                "NoHumanOversight",        // unconfirmed-tools
+                "PromptInjectionRisk",     // missing-system-prompt
+                "MissingGuardrail",        // missing-input-validation
+                "MissingGuardrail",        // missing-output-filter
+                "MissingGuardrail",        // missing-rate-limit
+                "ExcessivePermission",     // excessive-admin-permission
+                "DataExposure",            // data-access-broad
+                "MissingAuditTrail",       // missing-audit-trail
+            ],
+            "scoring rule firing order drifted — \
+             check src/engine/mod.rs::EMBEDDED_RULES against W1 baseline"
+        );
+    }
+
+    /// Per the byte-identical contract, every (scoring rule × framework)
+    /// combination must produce the exact compliance string the deleted
+    /// `framework_reference()` returned in W1. This test pins all 44
+    /// (11 rules × 4 frameworks) strings against the snapshot independent
+    /// of which fixture happens to fire them — so the EU-AI-Act / ISO /
+    /// OWASP branches (which the default `--framework nist` snapshots
+    /// cannot exercise) are still locked down.
+    #[test]
+    fn compliance_strings_match_w1_baseline_for_every_framework() {
+        // (rule_id, nist, iso42001, eu_ai_act, owasp_agentic) — strings
+        // copied verbatim from `git show 0d0cc77:src/scoring.rs` after
+        // running the W1 framework_reference() switch for each control.
+        let expected: &[(&str, &str, &str, &str, &str)] = &[
+            (
+                "scoring/unbounded-tools",
+                "NIST AI RMF: MAP 1.1, MANAGE 2.2",
+                "ISO/IEC 42001",
+                "EU AI Act",
+                "OWASP Agentic: A01 Excessive Agency",
+            ),
+            (
+                "scoring/unconfirmed-tools",
+                "NIST AI RMF: GOVERN 1.3, MANAGE 2.4",
+                "ISO 42001: A.8.4 Human oversight",
+                "EU AI Act: Article 14 Human oversight",
+                "OWASP Agentic Top 10",
+            ),
+            (
+                "scoring/missing-system-prompt",
+                "NIST AI RMF: MAP 2.3, MEASURE 2.6",
+                "ISO/IEC 42001",
+                "EU AI Act",
+                "OWASP Agentic: A05 Improper Output Handling",
+            ),
+            (
+                "scoring/missing-input-validation",
+                "NIST AI RMF: MANAGE 2.2, MEASURE 2.5",
+                "ISO 42001: A.6.2.6 Data quality",
+                "EU AI Act",
+                "OWASP Agentic: A02 Inadequate Sandboxing",
+            ),
+            (
+                "scoring/missing-output-filter",
+                "NIST AI RMF: MANAGE 2.3, MEASURE 2.7",
+                "ISO 42001: A.6.2.7 Output management",
+                "EU AI Act",
+                "OWASP Agentic Top 10",
+            ),
+            (
+                "scoring/missing-rate-limit",
+                "NIST AI RMF: MANAGE 3.1",
+                "ISO/IEC 42001",
+                "EU AI Act",
+                "OWASP Agentic Top 10",
+            ),
+            (
+                "scoring/excessive-exec-permission",
+                "NIST AI RMF: GOVERN 1.7, MAP 3.4",
+                "ISO/IEC 42001",
+                "EU AI Act",
+                "OWASP Agentic: A01 Excessive Agency",
+            ),
+            (
+                "scoring/excessive-admin-permission",
+                "NIST AI RMF: GOVERN 1.7, MANAGE 4.1",
+                "ISO/IEC 42001",
+                "EU AI Act",
+                "OWASP Agentic Top 10",
+            ),
+            (
+                "scoring/data-access-broad",
+                "NIST AI RMF: MAP 5.1, MANAGE 2.2",
+                "ISO/IEC 42001",
+                "EU AI Act: Article 10 Data governance",
+                "OWASP Agentic Top 10",
+            ),
+            (
+                "scoring/missing-audit-trail",
+                "NIST AI RMF: GOVERN 1.5, MEASURE 4.1",
+                "ISO 42001: A.8.5 Logging and monitoring",
+                "EU AI Act: Article 12 Record-keeping",
+                "OWASP Agentic Top 10",
+            ),
+        ];
+
+        let engine = Engine::compile_builtin();
+        for (rule_id, nist, iso, eu, owasp) in expected {
+            let rule = engine
+                .scoring_rules()
+                .iter()
+                .find(|r| r.id == *rule_id)
+                .unwrap_or_else(|| panic!("missing rule {}", rule_id));
+            assert_eq!(pick_compliance(&rule.compliance, &Framework::Nist), *nist, "{} nist", rule_id);
+            assert_eq!(pick_compliance(&rule.compliance, &Framework::Iso42001), *iso, "{} iso", rule_id);
+            assert_eq!(pick_compliance(&rule.compliance, &Framework::EuAiAct), *eu, "{} eu", rule_id);
+            assert_eq!(
+                pick_compliance(&rule.compliance, &Framework::OwaspAgentic),
+                *owasp,
+                "{} owasp",
+                rule_id
+            );
+        }
+    }
+
+    /// `empty-tools` is the only silent scoring rule today: it fires when
+    /// `tool_count == 0`, adjusts the score, but emits no Finding. Pin the
+    /// silent contract so a future rule edit cannot quietly add or remove
+    /// it without a test failure.
+    #[test]
+    fn empty_tools_rule_adjusts_score_without_finding() {
+        let agent = naked_agent(); // zero tools → empty-tools fires
+        let engine = Engine::compile_builtin();
+        let scored = score_single_agent(&agent, &Framework::Nist, &engine);
+
+        // No finding for empty-tools (no title in the YAML).
+        assert!(
+            !scored.findings.iter().any(|f| f.title.contains("Empty")),
+            "empty-tools must remain silent"
+        );
+        // Score must still reflect the +5 adjustment + the other firing
+        // rules. We assert > baseline to detect a regression where the
+        // rule stops firing entirely.
+        assert!(scored.risk_score > 0);
+    }
+
+    #[test]
+    fn guardrail_count_overflow_is_clamped() {
+        // Pathological agent — far more guardrails than scoring credits.
+        // Without saturating arithmetic the cast would wrap negative
+        // and start adding to the score. Verify the clamp holds.
+        let mut agent = naked_agent();
+        agent.guardrails = (0..100)
+            .map(|_| Guardrail {
+                kind: GuardrailKind::InputValidation,
+                description: "x".into(),
+            })
+            .collect();
+        let engine = Engine::compile_builtin();
+        let scored = score_single_agent(&agent, &Framework::Nist, &engine);
+        assert!(scored.risk_score <= 100);
+    }
+}

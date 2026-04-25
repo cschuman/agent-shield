@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Agent Shield is a Rust CLI tool (`agent-shield`) that statically scans a codebase for AI agents (LangChain, CrewAI, MCP, etc.), scores them for risk, and maps findings to compliance frameworks (NIST AI RMF, ISO 42001, EU AI Act, OWASP Agentic Top 10). Think "`npm audit` for AI agents."
 
-Rust edition 2024. Binary crate, no library target, no test suite yet.
+Rust edition 2024. Binary crate, no library target.
 
 ## Commands
 
@@ -18,32 +18,59 @@ cargo run -- scan <path> --framework owasp-agentic --min-risk 50
 cargo run -- scan . --format json -o report.json
 cargo run -- frameworks            # list supported frameworks + baselines
 cargo check                        # fast type check
-cargo clippy -- -D warnings        # lint
+cargo test                         # 68+ unit tests (loader, matcher, scoring, signals)
+cargo clippy -- -D warnings        # lint (must stay clean)
 cargo fmt                          # format
+bash scripts/snapshot.sh verify    # byte-identical regression oracle (6 fixtures)
 ```
-
-There are no tests in the repo yet; `cargo test` is a no-op.
 
 ## Architecture
 
 Three-stage pipeline in `src/main.rs`, one module per stage:
 
-1. **`scanner.rs`** — walks the directory (skipping `node_modules`, `target`, `.venv`, etc.), reads files with extensions in `SCAN_EXTENSIONS`, and applies per-framework `DetectionPattern`s. Also does a first pass over `package.json` / `pyproject.toml` / `requirements.txt` for dependency-based detection. Produces `Vec<DiscoveredAgent>` with extracted tools, system prompt, guardrails, data-access sources, and permissions — all via regex over file contents. Confidence gating: broad frameworks (`VercelAI`, `CustomAgent`) require ≥2 matches per file; others require 1.
+1. **`scanner.rs`** — walks the directory (skipping `node_modules`, `target`, `.venv`, etc.), reads files with extensions in `SCAN_EXTENSIONS`, and runs `engine.detection_rules()` over each. Produces `Vec<DiscoveredAgent>` with extracted tools, system prompt, guardrails, data-access sources, and permissions. Confidence gating uses each rule's `min_match_count` (2 for broad frameworks like VercelAI/CustomAgent, 1 otherwise).
 
-2. **`scoring.rs`** — takes `DiscoveredAgent`s and produces `ScoredAgent`s. Each agent starts at the framework baseline (`AgentFramework::risk_baseline`, 25–55), then adjustments are added/subtracted per factor (autonomy tier, tool count, missing guardrails, exec/admin permissions, data-access breadth, audit-trail absence). Guardrails give up to −25 credit. Final score clamped 0–100 → `RiskLevel` (Low/Medium/High/Critical). Each adjustment also emits a `Finding` with a `framework_reference(...)` pointing at the selected compliance framework's control ID.
+2. **`signals.rs`** — `compute_all_signals(&DiscoveredAgent) -> ContextSignals`. The fact set scoring rules read from: `tool_count`, `unconfirmed_tool_count`, `has_system_prompt`, `autonomy_tier`, `guardrails`, `permissions`, `data_source_count`, `has_audit_trail`. Adding a new signal requires coordinated edits in `signals.rs`, `engine/matcher.rs::evaluate_context_signal`, and `rules/loader.rs::is_known_signal`.
 
-3. **`report.rs`** — renders `ScoredAgent`s as terminal output (colored, with ASCII gauge + `comfy-table`) or JSON (`serde_json`). `OutputFormat` and the CLI `--format` flag are the entry points.
+3. **`scoring.rs`** — takes `DiscoveredAgent`s and produces `ScoredAgent`s. Each agent starts at the framework baseline (`AgentFramework::risk_baseline`, 25–55), gains/loses points from the autonomy-tier scalar, then loops over `engine.scoring_rules()` applying `score_adjustment` and materializing findings. Guardrails give up to −25 credit. Final score clamped 0–100 → `RiskLevel` (Low/Medium/High/Critical). Each finding's `framework_ref` is sourced from the rule's per-framework `compliance:` block via `pick_compliance`.
 
-`frameworks.rs` is the single source of truth for supported agent frameworks: enum `AgentFramework`, their `detection_patterns()`, and `risk_baseline()`. **Adding a new framework requires changes only here** — the scanner iterates `AgentFramework::all()` and scoring reads the baseline by name via `get_framework_baseline`.
+4. **`report.rs`** — renders `ScoredAgent`s as terminal output (colored, with ASCII gauge + `comfy-table`) or JSON (`serde_json`). `OutputFormat` and the CLI `--format` flag are the entry points.
+
+### Rule data layout (post-W2)
+
+Detection and scoring rules live as YAML in:
+
+- `rules/builtin/<framework>.yaml` — 10 detection rules, one per `AgentFramework` variant.
+- `rules/scoring/<slug>.yaml` — 11 Tier-2 scoring rules. The order of these in `EMBEDDED_RULES` (`src/engine/mod.rs`) is **load-bearing**: it pins the W1 finding-emission order which the snapshot fixtures hash against.
+
+The loader (`src/rules/loader.rs`) deserializes via `serde_yaml`, validates (schema_version, allowlisted signals, exactly-one matcher slot, etc.), and translates `ParsedRule` → `CompiledRule` / `CompiledScoringRule`. Bad rules quarantine into `RuleDiagnostic`s printed to stderr at engine init; the scan continues with the surviving rules.
+
+`AgentFramework` (`src/frameworks.rs`) keeps its enum identity — `name()`, `risk_baseline()`, `all()` — but no longer carries detection logic. Adding a new framework requires:
+
+1. New variant in `AgentFramework`.
+2. New `rules/builtin/<framework>.yaml`.
+3. Insert the entry into `EMBEDDED_RULES` in matching position.
+
+Adding a new scoring rule requires:
+
+1. New `rules/scoring/<slug>.yaml`.
+2. Insert into `EMBEDDED_RULES` at the correct **firing-order position** (the W2-C8 byte-identical contract).
+3. `bash scripts/snapshot.sh verify` to confirm no drift.
 
 ### Key invariants when editing
 
-- `scoring::get_framework_baseline` looks up by `AgentFramework::name()` *string*. If you rename a variant's display name, update any hard-coded string comparisons.
-- `scanner.rs` deduplicates agents by `(file_path, framework)` — if you change how agents are constructed, preserve this key or results will multi-count.
-- `framework_reference(framework, control)` in `scoring.rs` uses string `control` keys (`"tool-scope"`, `"human-oversight"`, …). New findings must use an existing key or add a match arm in **every** compliance framework branch.
-- Risk-level thresholds (0-25 / 26-50 / 51-75 / 76+) and scoring factor values are duplicated between `README.md` and `scoring.rs`. Keep them in sync.
+- `EMBEDDED_RULES` order in `src/engine/mod.rs` is load-bearing for snapshot tests. Detection entries must mirror `AgentFramework::all()` order; scoring entries must mirror W1 firing order. Reorder ⇒ snapshot diff.
+- `scoring::get_framework_baseline` looks up by `AgentFramework::name()` *string*. Renaming a variant's display name requires hunting any hard-coded string compares.
+- `scanner.rs` deduplicates agents by `(file_path, framework)` — preserve this key or counts double.
+- The signal allowlist appears in two places (`is_known_signal` in loader.rs, `evaluate_context_signal` in matcher.rs). They must stay in lockstep; a parity test would catch drift.
+- `Matcher::matches_repo` is wired but the v1.0 scanner only invokes `matches_file`. `package_dep:` and `file_present:` matchers in YAML are dormant until W3 lands the manifest pass.
+- Risk-level thresholds (0-25 / 26-50 / 51-75 / 76+) are duplicated between `README.md` and `scoring.rs`. Keep them in sync.
 
 ## Repo layout beyond `src/`
 
+- `rules/` — bundled rule data (detection + scoring YAML).
+- `tests/bad-rules/` — fixtures asserting the loader's quarantine paths.
+- `fixtures/` and `snapshots/` — corpus + golden JSON for `scripts/snapshot.sh`.
 - `docs/` — product/business docs (BRD, data model, roadmap, revenue thesis, infra plans). These describe the *paid dashboard* product, not the current OSS CLI. Treat as context for future direction, not as current spec.
+- `docs/rules-design/` — Path B refactor synthesis. `round3-synthesis.md` is the W2 scope source of truth.
 - `site/` — static marketing site deployed to Netlify (`site/netlify.toml`). Separate from the Rust crate.

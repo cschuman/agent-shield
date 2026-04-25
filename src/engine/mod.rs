@@ -23,6 +23,9 @@ use matcher::Matcher;
 #[derive(Debug, Clone)]
 pub struct CompiledRule {
     /// Stable identifier, e.g. `"framework/langchain/agent-detected"`.
+    /// Currently only consulted in diagnostics + tests; reserved for
+    /// per-rule reporting in v1.1.
+    #[allow(dead_code)]
     pub id: String,
     /// Framework this rule binds to. Stays as a Rust enum through Week 1;
     /// Week 2 may transition to a string-keyed reference into the framework
@@ -36,6 +39,7 @@ pub struct CompiledRule {
     pub min_match_count: u8,
     /// Reserved for v1.1 schema overlay support. Always `None` in v1.0; the
     /// YAML loader in Week 2 must reject non-null values.
+    #[allow(dead_code)]
     pub extends: Option<String>,
 }
 
@@ -48,6 +52,9 @@ pub struct CompiledRule {
 /// tree, since scoring runs after scanning is done).
 #[derive(Debug, Clone)]
 pub struct CompiledScoringRule {
+    /// Stable identifier, e.g. `"scoring/missing-system-prompt"`. Reserved
+    /// for per-rule diagnostics in v1.1.
+    #[allow(dead_code)]
     pub id: String,
     /// Snake_case category from the YAML, e.g. `prompt_injection_risk`.
     /// `scoring.rs::materialize_finding` maps this to `FindingCategory`.
@@ -62,6 +69,8 @@ pub struct CompiledScoringRule {
     pub matcher: Matcher,
     pub score_adjustment: i32,
     pub compliance: Compliance,
+    /// Reserved for v1.1 schema overlay support; loader rejects non-null.
+    #[allow(dead_code)]
     pub extends: Option<String>,
 }
 
@@ -77,11 +86,6 @@ pub struct CompiledRuleSet {
     pub scoring_rules: Vec<CompiledScoringRule>,
 }
 
-impl CompiledRuleSet {
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
 
 /// Detection engine.
 ///
@@ -94,10 +98,6 @@ pub struct Engine {
 }
 
 impl Engine {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Iterate detection rules in source order.
     pub fn detection_rules(&self) -> &[CompiledRule] {
         &self.rules.rules
@@ -125,8 +125,16 @@ impl Engine {
     /// The hardcoded matcher tree is gone; rule definitions live in
     /// `rules/builtin/*.yaml` (detection) and `rules/scoring/*.yaml` (scoring).
     /// Adding a framework now means: enum variant + YAML file + EMBEDDED_RULES entry.
+    ///
+    /// Behind a `OnceLock` so a process-wide scan only parses + regex-compiles
+    /// the bundle once. `Clone` is cheap (`Arc`-shaped fields), so the public
+    /// API hands out owned values and callers don't have to thread a
+    /// `&'static Engine` everywhere.
     pub fn compile_builtin() -> Self {
-        Self::compile_yaml(EMBEDDED_RULES)
+        static BUILTIN: std::sync::OnceLock<Engine> = std::sync::OnceLock::new();
+        BUILTIN
+            .get_or_init(|| Self::compile_yaml(EMBEDDED_RULES))
+            .clone()
     }
 
     /// Compile from a bundle of `(source_key, yaml_text)` pairs.
@@ -171,18 +179,26 @@ impl Engine {
 /// Bundled rules — both detection (Tier-1) and scoring (Tier-2),
 /// concatenated at build time via `include_str!`.
 ///
-/// **Ordering invariants:**
-/// - Detection rules: order matches `AgentFramework::all()` so users
-///   reading rule IDs can predict scan output without grepping a slug map.
-/// - Scoring rules: order matches the firing order of the legacy inline
-///   findings in `scoring.rs::score_single_agent` (W1 baseline). This is
-///   the byte-identical contract — JSON output preserves finding emission
-///   order, which is rule-load order. Re-arrange this list and you will
-///   break snapshot tests.
+/// **CRITICAL — DO NOT REORDER WITHOUT RUNNING `bash scripts/snapshot.sh verify`.**
+///
+/// Ordering is load-bearing in two distinct ways:
+///
+/// - **Detection rules** (entries 1–10): order matches `AgentFramework::all()`
+///   enum declaration order. Inserting a new framework requires inserting its
+///   YAML entry in the matching position. A mismatch produces silently
+///   misaligned rule IDs — the snapshot diff will catch it but the failure
+///   mode is "rule X is now at position Y" which is hard to read.
+///
+/// - **Scoring rules** (entries 11–21): order matches the firing order of
+///   the legacy inline `findings.push` blocks in W1's `score_single_agent`
+///   (see `git show 0d0cc77:src/scoring.rs`). This is the byte-identical
+///   contract for W2-C8 — JSON output preserves finding-emission order,
+///   which is rule-load order. Reorder this list and snapshot tests fail.
 ///
 /// When adding a framework: enum variant + `rules/builtin/<slug>.yaml` +
-/// new detection entry here. When adding a scoring rule: write the YAML +
-/// add an entry in the firing-order position.
+/// new detection entry here in matching position. When adding a scoring
+/// rule: write the YAML + add an entry in the firing-order position +
+/// run `bash scripts/snapshot.sh verify` before committing.
 pub const EMBEDDED_RULES: &[(&str, &str)] = &[
     // ===== Detection rules (Tier-1) =====
     ("langchain", include_str!("../../rules/builtin/langchain.yaml")),

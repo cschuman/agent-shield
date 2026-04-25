@@ -99,11 +99,37 @@ fn parse_one(source: &str, content: &str) -> Result<ParsedOne, RuleDiagnostic> {
         ));
     }
 
-    if parsed.extends.is_some() {
+    // `extends:` is reserved for v1.1 overlay support. Treat both
+    // `Some("anything")` and `Some("")` (empty string) as non-null —
+    // contributors who type `extends: ""` thinking it means "no parent"
+    // get the same diagnostic as those who set a real value.
+    if let Some(parent) = parsed.extends.as_deref() {
+        let extra = if parent.is_empty() {
+            " (use `extends: null` or omit the field entirely)"
+        } else {
+            ""
+        };
         return Err(RuleDiagnostic::new(
             source,
             Some(&parsed.id),
-            "`extends` is reserved for v1.1 — must be null in v1.0",
+            format!("`extends` is reserved for v1.1 — must be null in v1.0{}", extra),
+        ));
+    }
+
+    // Closed allowlist of category strings. Detection routes one way,
+    // every scoring `FindingCategory` routes the other; anything else
+    // is a typo or a stray draft field and we want it caught loud.
+    if !is_known_category(&parsed.category) {
+        return Err(RuleDiagnostic::new(
+            source,
+            Some(&parsed.id),
+            format!(
+                "unknown category `{}` — must be one of: detection, missing_guardrail, \
+                 excessive_permission, data_exposure, prompt_injection_risk, \
+                 no_human_oversight, unbounded_autonomy, missing_audit_trail, \
+                 detection_uncertainty",
+                parsed.category
+            ),
         ));
     }
 
@@ -112,6 +138,25 @@ fn parse_one(source: &str, content: &str) -> Result<ParsedOne, RuleDiagnostic> {
     } else {
         translate_scoring(source, parsed).map(ParsedOne::Scoring)
     }
+}
+
+/// Allowlist of category strings the loader accepts. `detection` routes
+/// to the Tier-1 path; everything else is a Tier-2 finding category.
+/// `detection_uncertainty` is a special case — used by `empty-tools`,
+/// the only silent rule that adjusts score without surfacing a finding.
+fn is_known_category(s: &str) -> bool {
+    matches!(
+        s,
+        "detection"
+            | "missing_guardrail"
+            | "excessive_permission"
+            | "data_exposure"
+            | "prompt_injection_risk"
+            | "no_human_oversight"
+            | "unbounded_autonomy"
+            | "missing_audit_trail"
+            | "detection_uncertainty"
+    )
 }
 
 fn translate_scoring(
@@ -142,6 +187,20 @@ fn translate_scoring(
         )
     })?;
 
+    // Bound score_adjustment to a sane range. Today's rules sit in [5, 20];
+    // capping at ±100 leaves headroom for v1.x without inviting integer
+    // overflow downstream where scoring.rs casts to i16 and accumulates.
+    if !(-100..=100).contains(&score_adjustment) {
+        return Err(RuleDiagnostic::new(
+            source,
+            Some(&id),
+            format!(
+                "score_adjustment {} is outside the allowed range [-100, 100]",
+                score_adjustment
+            ),
+        ));
+    }
+
     // Title is optional (silent score-bump rules like empty-tools have none),
     // but if title is present, remediation+compliance must also be present —
     // otherwise the rendered Finding would be incomplete.
@@ -153,12 +212,37 @@ fn translate_scoring(
                 "rule has `title` but no `remediation` — finding would be incomplete",
             ));
         }
-        if parsed.compliance.is_none() {
-            return Err(RuleDiagnostic::new(
+        let compliance = parsed.compliance.as_ref().ok_or_else(|| {
+            RuleDiagnostic::new(
                 source,
                 Some(&id),
                 "rule has `title` but no `compliance` block — cannot map to user --framework",
-            ));
+            )
+        })?;
+        // pick_compliance() in scoring.rs reads .first() from each list. Lists
+        // with multiple elements would silently drop entries beyond the first;
+        // empty lists fall through to a generic framework label that drifts
+        // from the byte-identical W1 strings. Pin every framework to exactly
+        // one entry today and revisit the multi-element shape in v1.1.
+        let frameworks: [(&str, &Vec<String>); 4] = [
+            ("nist_ai_rmf", &compliance.nist_ai_rmf),
+            ("iso_42001", &compliance.iso_42001),
+            ("eu_ai_act", &compliance.eu_ai_act),
+            ("owasp_agentic", &compliance.owasp_agentic),
+        ];
+        for (key, values) in frameworks {
+            if values.len() != 1 {
+                return Err(RuleDiagnostic::new(
+                    source,
+                    Some(&id),
+                    format!(
+                        "compliance.{} must have exactly one entry (got {}) — \
+                         the byte-identical contract reads .first() and ignores the rest",
+                        key,
+                        values.len()
+                    ),
+                ));
+            }
         }
     }
 
@@ -338,7 +422,15 @@ fn translate_matcher(
             source, rule_id, inner,
         )?)));
     }
-    unreachable!("populated_slot_count check above enforces one branch matches")
+    // Defense in depth: if a future ParsedMatcher field is added without
+    // updating populated_slot_count + a translate branch above, surface
+    // the inconsistency as a diagnostic rather than panicking the binary.
+    Err(RuleDiagnostic::new(
+        source,
+        Some(rule_id),
+        "internal: matcher slot accounted for by populated_slot_count \
+         but not handled in translate_matcher (loader bug — please report)",
+    ))
 }
 
 fn translate_children(
@@ -532,6 +624,36 @@ compliance:
   owasp_agentic: ["d"]
 "#;
         let err = one(yaml).expect_err("must reject");
+        assert!(err.message.contains("only context signals"));
+    }
+
+    /// Defense for `is_signal_only`'s recursion: a file primitive nested
+    /// inside `not:` (which itself is nested inside `all_of:`) must still
+    /// be rejected. If a future refactor drops a recursion arm, this test
+    /// catches it before the rule silently never fires.
+    #[test]
+    fn rejects_scoring_rule_with_nested_file_primitive() {
+        let yaml = r#"
+schema_version: "1.0"
+id: "bad"
+category: missing_guardrail
+severity: high
+description: "x"
+title: "x"
+remediation: "x"
+score_adjustment: 10
+when:
+  all_of:
+    - context_signal: { name: has_system_prompt, op: eq, value: false }
+    - not:
+        import_contains: "langchain"
+compliance:
+  nist_ai_rmf:   ["a"]
+  iso_42001:     ["b"]
+  eu_ai_act:     ["c"]
+  owasp_agentic: ["d"]
+"#;
+        let err = one(yaml).expect_err("must reject nested file primitive");
         assert!(err.message.contains("only context signals"));
     }
 
@@ -744,6 +866,94 @@ when:
     }
 
     #[test]
+    fn rejects_unknown_category() {
+        let yaml = r#"
+schema_version: "1.0"
+id: "x"
+category: scoring
+severity: high
+description: "x"
+score_adjustment: 5
+when:
+  context_signal: { name: has_system_prompt, op: eq, value: false }
+"#;
+        let err = one(yaml).expect_err("must reject unknown category");
+        assert!(
+            err.message.contains("unknown category"),
+            "expected unknown-category diagnostic, got: {}",
+            err.message
+        );
+    }
+
+    #[test]
+    fn rejects_empty_string_extends() {
+        let yaml = r#"
+schema_version: "1.0"
+id: "x"
+category: detection
+framework: LangChain
+severity: high
+description: "x"
+when:
+  any_of:
+    - import_contains: "langchain"
+extends: ""
+"#;
+        let err = one(yaml).expect_err("empty extends still counts as non-null");
+        assert!(err.message.contains("extends"));
+        // Extra hint should call out the user's likely intent.
+        assert!(err.message.contains("null"));
+    }
+
+    #[test]
+    fn rejects_score_adjustment_out_of_range() {
+        let yaml = r#"
+schema_version: "1.0"
+id: "x"
+category: missing_guardrail
+severity: high
+description: "x"
+title: "x"
+remediation: "x"
+score_adjustment: 9999
+when:
+  context_signal: { name: has_system_prompt, op: eq, value: false }
+compliance:
+  nist_ai_rmf:   ["a"]
+  iso_42001:     ["b"]
+  eu_ai_act:     ["c"]
+  owasp_agentic: ["d"]
+"#;
+        let err = one(yaml).expect_err("9999 is out of range");
+        assert!(err.message.contains("score_adjustment"));
+        assert!(err.message.contains("range"));
+    }
+
+    #[test]
+    fn rejects_compliance_with_multiple_entries() {
+        let yaml = r#"
+schema_version: "1.0"
+id: "x"
+category: missing_guardrail
+severity: high
+description: "x"
+title: "x"
+remediation: "x"
+score_adjustment: 5
+when:
+  context_signal: { name: has_system_prompt, op: eq, value: false }
+compliance:
+  nist_ai_rmf:   ["a", "b"]
+  iso_42001:     ["c"]
+  eu_ai_act:     ["d"]
+  owasp_agentic: ["e"]
+"#;
+        let err = one(yaml).expect_err("two-entry list must be rejected");
+        assert!(err.message.contains("compliance.nist_ai_rmf"));
+        assert!(err.message.contains("exactly one entry"));
+    }
+
+    #[test]
     fn rejects_ordering_op_on_bool_signal() {
         let yaml = r#"
 schema_version: "1.0"
@@ -815,7 +1025,10 @@ when:
 
         #[test]
         fn bad_regex_quarantined() {
-            quarantines_one("bad-regex", BAD_REGEX, "regex");
+            // Tighten the substring vs. the looser "regex" used previously —
+            // "regex" also appears in serde's "unknown field" suggestion list,
+            // which let an earlier fixture pass for the wrong reason.
+            quarantines_one("bad-regex", BAD_REGEX, "failed to compile");
         }
 
         #[test]
