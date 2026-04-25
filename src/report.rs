@@ -111,7 +111,7 @@ fn render_terminal(agents: &[ScoredAgent], framework: &Framework) {
         .collect();
 
     // Sort by severity (critical first)
-    all_findings.sort_by(|a, b| severity_rank(&b.1.severity).cmp(&severity_rank(&a.1.severity)));
+    all_findings.sort_by_key(|f| std::cmp::Reverse(severity_rank(&f.1.severity)));
 
     if !all_findings.is_empty() {
         println!(
