@@ -76,3 +76,19 @@ Adding a new scoring rule requires:
 - `docs/` — product/business docs (BRD, data model, roadmap, revenue thesis, infra plans). These describe the *paid dashboard* product, not the current OSS CLI. Treat as context for future direction, not as current spec.
 - `docs/rules-design/` — Path B refactor synthesis. `round3-synthesis.md` is the W2 scope source of truth.
 - `site/` — static marketing site deployed to Netlify (`site/netlify.toml`). Separate from the Rust crate.
+
+## Snapshot drift recovery
+
+CI (`.github/workflows/ci.yml`) runs `bash scripts/snapshot.sh verify` on every PR. When that job goes red, follow this exact 3-step workflow:
+
+```bash
+cargo build --release
+bash scripts/snapshot.sh verify       # see the diff
+bash scripts/snapshot.sh capture      # only if intentional; review every byte before committing
+```
+
+If the diff is **intentional** (you changed a rule, scoring weight, or finding text on purpose): run `capture`, then commit the changed `snapshots/*.json` files in their own commit titled `snapshot: <reason>`. Reviewers should be able to scrutinize byte-level changes in isolation, separate from the source change that produced them.
+
+If the diff is **unintentional**: revert the offending source change. The snapshots are the source of truth, not the code. The byte-identical contract has survived W1, W2, and every review round — preserve it.
+
+Never let CI auto-update snapshots. The whole point of the oracle is that drift is a human decision.
