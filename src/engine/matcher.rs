@@ -80,7 +80,7 @@ pub struct RepoCtx<'a> {
 // `ContextSignals`, `GuardrailFlags`, and `PermissionFlags` were defined
 // here in W2-C1 and moved to `crate::signals` in W2-C2. The matcher
 // imports them for the `matches_signals` evaluator below.
-pub use crate::signals::{ContextSignals, GuardrailFlags, PermissionFlags};
+pub use crate::signals::ContextSignals;
 
 /// Comparison operator for a `Matcher::ContextSignal`. `Gt`/`Gte`/`Lt`/`Lte`
 /// are valid only for integer signal values; the loader rejects ordering

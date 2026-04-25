@@ -1,6 +1,8 @@
-use crate::scanner::DiscoveredAgent;
+use crate::engine::{CompiledScoringRule, Engine};
 use crate::frameworks::AgentFramework;
-use crate::signals::compute_all_signals;
+use crate::rules::types::{Compliance, ParsedSeverity};
+use crate::scanner::DiscoveredAgent;
+use crate::signals::{compute_all_signals, ContextSignals};
 use serde::Serialize;
 
 #[derive(Debug, Clone, clap::ValueEnum)]
@@ -89,166 +91,53 @@ pub enum Severity {
 }
 
 pub fn score_agents(agents: &[DiscoveredAgent], compliance_framework: &Framework) -> Vec<ScoredAgent> {
-    agents.iter().map(|agent| score_single_agent(agent, compliance_framework)).collect()
+    let engine = Engine::compile_builtin();
+    agents
+        .iter()
+        .map(|agent| score_single_agent(agent, compliance_framework, &engine))
+        .collect()
 }
 
-fn score_single_agent(agent: &DiscoveredAgent, compliance_framework: &Framework) -> ScoredAgent {
-    // Compute the v1 fact set once. After W2-C8 the scoring rules will read
-    // these signals via Matcher::matches_signals; for now the inline findings
-    // below consume the pre-computed fields directly.
+fn score_single_agent(
+    agent: &DiscoveredAgent,
+    compliance_framework: &Framework,
+    engine: &Engine,
+) -> ScoredAgent {
+    // Compute the v1 fact set once. Scoring rules read these signals via
+    // matches_signals; the unconditional autonomy and guardrail-credit
+    // adjustments stay inline because they're scalar transforms, not
+    // discrete findings.
     let signals = compute_all_signals(agent);
 
     let mut score: i16 = get_framework_baseline(&agent.framework);
     let mut findings = Vec::new();
 
-    // Autonomy tier assessment (NIST 4-tier)
+    // Autonomy tier scalar — unconditional, applied before rule loop.
     let autonomy_tier = signals.autonomy_tier;
     score += (autonomy_tier as i16 - 1) * 10;
 
-    // Tool count risk
-    if signals.tool_count == 0 {
-        // No tools detected = might be missing detection, slight risk bump
-        score += 5;
-    } else if signals.tool_count > 10 {
-        score += 15;
-        findings.push(Finding {
-            category: FindingCategory::UnboundedAutonomy,
-            severity: Severity::Medium,
-            title: format!("Agent has {} tools", signals.tool_count),
-            description: "Agents with many tools have a larger attack surface and blast radius.".into(),
-            remediation: "Apply principle of least privilege — only grant tools the agent needs for its specific task.".into(),
-            framework_ref: framework_reference(compliance_framework, "tool-scope"),
-        });
+    // Drive findings + score adjustments off the YAML-defined scoring rule
+    // set, in source order. EMBEDDED_RULES enforces firing order to keep
+    // snapshot output byte-identical.
+    for rule in engine.scoring_rules() {
+        if rule.matcher.matches_signals(&signals).is_empty() {
+            continue;
+        }
+        score += rule.score_adjustment as i16;
+        if let Some(finding) = materialize_finding(rule, compliance_framework, &signals) {
+            findings.push(finding);
+        }
     }
 
-    // Tools without confirmation gates
-    if signals.unconfirmed_tool_count > 0 && signals.tool_count > 3 {
-        score += 10;
-        findings.push(Finding {
-            category: FindingCategory::NoHumanOversight,
-            severity: Severity::High,
-            title: "Tools execute without human confirmation".into(),
-            description: format!(
-                "{} of {} tools can execute without human approval.",
-                signals.unconfirmed_tool_count,
-                signals.tool_count
-            ),
-            remediation: "Add human-in-the-loop confirmation for destructive or high-impact tool calls.".into(),
-            framework_ref: framework_reference(compliance_framework, "human-oversight"),
-        });
-    }
-
-    // System prompt analysis
-    if !signals.has_system_prompt {
-        score += 10;
-        findings.push(Finding {
-            category: FindingCategory::PromptInjectionRisk,
-            severity: Severity::Medium,
-            title: "No system prompt detected".into(),
-            description: "Agent has no detectable system prompt defining its role, boundaries, or behavioral constraints.".into(),
-            remediation: "Add an explicit system prompt that defines the agent's role, scope, and prohibited actions.".into(),
-            framework_ref: framework_reference(compliance_framework, "prompt-safety"),
-        });
-    }
-
-    // Guardrail assessment
-    if !signals.guardrails.input_validation {
-        score += 10;
-        findings.push(Finding {
-            category: FindingCategory::MissingGuardrail,
-            severity: Severity::High,
-            title: "No input validation detected".into(),
-            description: "Agent does not appear to validate or sanitize inputs before processing.".into(),
-            remediation: "Implement input validation and sanitization to prevent prompt injection attacks.".into(),
-            framework_ref: framework_reference(compliance_framework, "input-validation"),
-        });
-    }
-
-    if !signals.guardrails.output_filtering {
-        score += 5;
-        findings.push(Finding {
-            category: FindingCategory::MissingGuardrail,
-            severity: Severity::Medium,
-            title: "No output filtering detected".into(),
-            description: "Agent outputs are not filtered for sensitive data, PII, or inappropriate content.".into(),
-            remediation: "Add output filtering to prevent data leakage and inappropriate responses.".into(),
-            framework_ref: framework_reference(compliance_framework, "output-safety"),
-        });
-    }
-
-    if !signals.guardrails.rate_limit {
-        score += 5;
-        findings.push(Finding {
-            category: FindingCategory::MissingGuardrail,
-            severity: Severity::Low,
-            title: "No rate limiting detected".into(),
-            description: "Agent has no apparent rate limiting, allowing unbounded execution.".into(),
-            remediation: "Add rate limiting to prevent runaway costs and denial-of-service scenarios.".into(),
-            framework_ref: framework_reference(compliance_framework, "rate-limit"),
-        });
-    }
-
-    // Permission assessment — bound locally so the permission_summary block
-    // below stays readable.
+    // Permission summary uses the bool flags computed in signals.rs.
     let has_exec = signals.permissions.execute;
     let has_admin = signals.permissions.admin;
     let has_write = signals.permissions.write;
 
-    if has_exec {
-        score += 20;
-        findings.push(Finding {
-            category: FindingCategory::ExcessivePermission,
-            severity: Severity::Critical,
-            title: "Agent can execute system commands".into(),
-            description: "Agent has access to system command execution (subprocess, shell, exec).".into(),
-            remediation: "Remove system command access unless absolutely required. If required, implement strict allowlisting.".into(),
-            framework_ref: framework_reference(compliance_framework, "exec-permission"),
-        });
-    }
-
-    if has_admin {
-        score += 15;
-        findings.push(Finding {
-            category: FindingCategory::ExcessivePermission,
-            severity: Severity::Critical,
-            title: "Agent has admin-level permissions".into(),
-            description: "Agent operates with elevated/admin privileges.".into(),
-            remediation: "Apply principle of least privilege. Run agents with minimal required permissions.".into(),
-            framework_ref: framework_reference(compliance_framework, "least-privilege"),
-        });
-    }
-
-    // Data access assessment
-    if signals.data_source_count > 3 {
-        score += 10;
-        findings.push(Finding {
-            category: FindingCategory::DataExposure,
-            severity: Severity::Medium,
-            title: format!("Agent accesses {} data sources", signals.data_source_count),
-            description: "Agent has broad data access across multiple sources, increasing blast radius.".into(),
-            remediation: "Restrict data access to only the sources required for the agent's specific function.".into(),
-            framework_ref: framework_reference(compliance_framework, "data-access"),
-        });
-    }
-
-    // No audit trail detection
-    if !signals.has_audit_trail {
-        score += 5;
-        findings.push(Finding {
-            category: FindingCategory::MissingAuditTrail,
-            severity: Severity::Medium,
-            title: "No audit trail detected".into(),
-            description: "Agent actions are not logged for audit or forensic purposes.".into(),
-            remediation: "Implement comprehensive logging of all agent decisions, tool calls, and outputs.".into(),
-            framework_ref: framework_reference(compliance_framework, "audit-trail"),
-        });
-    }
-
-    // Guardrail credit (reduce score for good practices)
+    // Guardrail credit — unconditional reduction, scalar not finding.
     let guardrail_credit = (agent.guardrails.len() as i16 * 5).min(25);
     score -= guardrail_credit;
 
-    // Clamp to 0-100
     let final_score = score.clamp(0, 100) as u8;
 
     let risk_level = match final_score {
@@ -292,6 +181,91 @@ fn score_single_agent(agent: &DiscoveredAgent, compliance_framework: &Framework)
     }
 }
 
+/// Build a `Finding` from a matched scoring rule. Returns `None` for
+/// "silent" rules (e.g. `empty-tools`) that adjust score without surfacing
+/// a finding to the user.
+fn materialize_finding(
+    rule: &CompiledScoringRule,
+    framework: &Framework,
+    signals: &ContextSignals,
+) -> Option<Finding> {
+    let title_template = rule.title.as_ref()?;
+    let remediation = rule.remediation.as_ref()?;
+
+    Some(Finding {
+        category: map_category(&rule.category),
+        severity: map_severity(rule.severity),
+        title: substitute_signal_placeholders(title_template, signals),
+        description: substitute_signal_placeholders(&rule.description, signals),
+        remediation: remediation.clone(),
+        framework_ref: pick_compliance(&rule.compliance, framework),
+    })
+}
+
+/// Replace `{signal_name}` placeholders with current signal values. Only
+/// the integer signals make sense in titles/descriptions today; bool
+/// substitution would be redundant since rules are gated on those values.
+fn substitute_signal_placeholders(template: &str, signals: &ContextSignals) -> String {
+    template
+        .replace("{tool_count}", &signals.tool_count.to_string())
+        .replace(
+            "{unconfirmed_tool_count}",
+            &signals.unconfirmed_tool_count.to_string(),
+        )
+        .replace(
+            "{data_source_count}",
+            &signals.data_source_count.to_string(),
+        )
+        .replace("{autonomy_tier}", &signals.autonomy_tier.to_string())
+}
+
+/// Map a YAML scoring category string to the Rust enum surfaced in JSON
+/// output. Unknown categories collapse to `MissingGuardrail` rather than
+/// panicking — the loader-validated set never produces unknowns, but we
+/// stay defensive in case a future YAML drifts.
+fn map_category(s: &str) -> FindingCategory {
+    match s {
+        "missing_guardrail" => FindingCategory::MissingGuardrail,
+        "excessive_permission" => FindingCategory::ExcessivePermission,
+        "data_exposure" => FindingCategory::DataExposure,
+        "prompt_injection_risk" => FindingCategory::PromptInjectionRisk,
+        "no_human_oversight" => FindingCategory::NoHumanOversight,
+        "unbounded_autonomy" => FindingCategory::UnboundedAutonomy,
+        "missing_audit_trail" => FindingCategory::MissingAuditTrail,
+        "detection_uncertainty" => FindingCategory::MissingGuardrail,
+        _ => FindingCategory::MissingGuardrail,
+    }
+}
+
+fn map_severity(s: ParsedSeverity) -> Severity {
+    match s {
+        ParsedSeverity::Low => Severity::Low,
+        ParsedSeverity::Medium => Severity::Medium,
+        ParsedSeverity::High => Severity::High,
+        ParsedSeverity::Critical => Severity::Critical,
+    }
+}
+
+/// Pick the compliance string for the user's selected `--framework`.
+/// Falls back to a generic framework label when a rule's compliance entry
+/// is empty.
+fn pick_compliance(c: &Compliance, fw: &Framework) -> String {
+    let v = match fw {
+        Framework::Nist => &c.nist_ai_rmf,
+        Framework::Iso42001 => &c.iso_42001,
+        Framework::EuAiAct => &c.eu_ai_act,
+        Framework::OwaspAgentic => &c.owasp_agentic,
+    };
+    v.first().cloned().unwrap_or_else(|| {
+        match fw {
+            Framework::Nist => "NIST AI RMF".to_string(),
+            Framework::Iso42001 => "ISO/IEC 42001".to_string(),
+            Framework::EuAiAct => "EU AI Act".to_string(),
+            Framework::OwaspAgentic => "OWASP Agentic Top 10".to_string(),
+        }
+    })
+}
+
 fn get_framework_baseline(framework_name: &str) -> i16 {
     for fw in AgentFramework::all() {
         if fw.name() == framework_name {
@@ -301,40 +275,3 @@ fn get_framework_baseline(framework_name: &str) -> i16 {
     50 // unknown framework
 }
 
-fn framework_reference(framework: &Framework, control: &str) -> String {
-    match framework {
-        Framework::Nist => match control {
-            "tool-scope" => "NIST AI RMF: MAP 1.1, MANAGE 2.2".into(),
-            "human-oversight" => "NIST AI RMF: GOVERN 1.3, MANAGE 2.4".into(),
-            "prompt-safety" => "NIST AI RMF: MAP 2.3, MEASURE 2.6".into(),
-            "input-validation" => "NIST AI RMF: MANAGE 2.2, MEASURE 2.5".into(),
-            "output-safety" => "NIST AI RMF: MANAGE 2.3, MEASURE 2.7".into(),
-            "rate-limit" => "NIST AI RMF: MANAGE 3.1".into(),
-            "exec-permission" => "NIST AI RMF: GOVERN 1.7, MAP 3.4".into(),
-            "least-privilege" => "NIST AI RMF: GOVERN 1.7, MANAGE 4.1".into(),
-            "data-access" => "NIST AI RMF: MAP 5.1, MANAGE 2.2".into(),
-            "audit-trail" => "NIST AI RMF: GOVERN 1.5, MEASURE 4.1".into(),
-            _ => "NIST AI RMF".into(),
-        },
-        Framework::Iso42001 => match control {
-            "human-oversight" => "ISO 42001: A.8.4 Human oversight".into(),
-            "input-validation" => "ISO 42001: A.6.2.6 Data quality".into(),
-            "output-safety" => "ISO 42001: A.6.2.7 Output management".into(),
-            "audit-trail" => "ISO 42001: A.8.5 Logging and monitoring".into(),
-            _ => "ISO/IEC 42001".into(),
-        },
-        Framework::EuAiAct => match control {
-            "human-oversight" => "EU AI Act: Article 14 Human oversight".into(),
-            "audit-trail" => "EU AI Act: Article 12 Record-keeping".into(),
-            "data-access" => "EU AI Act: Article 10 Data governance".into(),
-            _ => "EU AI Act".into(),
-        },
-        Framework::OwaspAgentic => match control {
-            "exec-permission" => "OWASP Agentic: A01 Excessive Agency".into(),
-            "tool-scope" => "OWASP Agentic: A01 Excessive Agency".into(),
-            "prompt-safety" => "OWASP Agentic: A05 Improper Output Handling".into(),
-            "input-validation" => "OWASP Agentic: A02 Inadequate Sandboxing".into(),
-            _ => "OWASP Agentic Top 10".into(),
-        },
-    }
-}

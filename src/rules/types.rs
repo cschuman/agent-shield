@@ -153,8 +153,7 @@ pub enum ParsedSignalValue {
     Str(String),
 }
 
-/// Per-rule compliance metadata. Replaces the hardcoded
-/// `framework_reference()` switch in `scoring.rs` once W2-C8 lands.
+/// Per-rule compliance metadata, surfaced on each emitted Finding.
 ///
 /// Each framework's value is a list of control identifiers. Multi-control
 /// strings (e.g. `"MAP 2.3, MEASURE 2.6"`) are stored as a single element
