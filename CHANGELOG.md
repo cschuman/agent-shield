@@ -12,7 +12,7 @@ shape of bundled and contributor-authored rule YAML.
 
 ## [Unreleased]
 
-## [0.1.0]
+## [0.1.0] - 2026-04-25
 
 First tagged release. Freezes the W2 rules-as-data refactor as a stable,
 downloadable reference point.
