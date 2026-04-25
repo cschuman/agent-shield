@@ -4,10 +4,24 @@ category: detection
 severity: high
 description: "CrewAI multi-agent crew detected"
 framework: CrewAI
+# all_of below is itself the gate.
 min_match_count: 1
 extends: null
 when:
-  any_of:
-    - import_contains: "crewai"
-    - import_contains: "from crewai"
-    - package_dep: "crewai"
+  # Calibration on crewAIInc/crewAI-examples showed bare `import crewai`
+  # fired on tasks.py orchestrator files, agent-tool aux modules, and any
+  # crew helper. Require an Agent/Crew constructor or @CrewBase decorator
+  # in addition to the import.
+  #
+  # Fixture compatibility: fixtures/crewai-tools/main.py uses `Agent(...)`
+  # and `Crew(...)` — both still match.
+  all_of:
+    - any_of:
+        - code_regex: '^\s*(from|import)\s+crewai'
+    - any_of:
+        - code_regex: '\bAgent\s*\('
+        - code_regex: '\bCrew\s*\('
+        - code_regex: '@CrewBase\b'
+        - code_regex: '@agent\b'
+        - code_regex: '@crew\b'
+        - code_regex: '@task\b'
