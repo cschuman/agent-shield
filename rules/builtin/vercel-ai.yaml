@@ -4,8 +4,10 @@ category: detection
 severity: high
 description: "Vercel AI SDK agent or tool usage detected"
 framework: VercelAI
-# all_of below is itself the gate; min_match_count: 1 is sufficient.
-min_match_count: 1
+# all_of is the structural gate; min_match_count: 2 is the floor (still
+# guards against single-line files that happen to satisfy both branches
+# in one regex hit each — a defensive holdover from the original rule).
+min_match_count: 2
 extends: null
 when:
   # Calibration on vercel/ai showed 1,291 detections — every one was a
