@@ -7,10 +7,17 @@ framework: AnthropicMCP
 min_match_count: 1
 extends: null
 when:
+  # Calibration on langchain-ai/langgraph and modelcontextprotocol/servers
+  # showed `import_contains: "mcp"` (3-char substring) was the noisiest
+  # matcher in the rule set: it fired on `connect_mcp`, `client_mcp_v1`,
+  # `mcpd`, `tmcp`, and any line where the word `import` appeared near
+  # any token containing `mcp`. Replaced with anchored variants requiring
+  # the actual MCP package or namespace.
   any_of:
     - import_contains: "@modelcontextprotocol"
-    - import_contains: "mcp"
+    - code_regex: '^\s*from\s+mcp(\.|\s+import\b)'
+    - code_regex: '^\s*import\s+mcp(\.|\s|$)'
     - file_present: "mcp.json"
     - file_present: ".mcp.json"
-    - code_regex: 'McpServer'
-    - code_regex: 'mcp_server'
+    - code_regex: '\bMcpServer\s*\('
+    - code_regex: '\bmcp_server\s*\('
