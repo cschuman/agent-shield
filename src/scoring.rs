@@ -1,5 +1,6 @@
-use crate::scanner::{DiscoveredAgent, GuardrailKind, PermissionLevel};
+use crate::scanner::DiscoveredAgent;
 use crate::frameworks::AgentFramework;
+use crate::signals::compute_all_signals;
 use serde::Serialize;
 
 #[derive(Debug, Clone, clap::ValueEnum)]
@@ -92,23 +93,28 @@ pub fn score_agents(agents: &[DiscoveredAgent], compliance_framework: &Framework
 }
 
 fn score_single_agent(agent: &DiscoveredAgent, compliance_framework: &Framework) -> ScoredAgent {
+    // Compute the v1 fact set once. After W2-C8 the scoring rules will read
+    // these signals via Matcher::matches_signals; for now the inline findings
+    // below consume the pre-computed fields directly.
+    let signals = compute_all_signals(agent);
+
     let mut score: i16 = get_framework_baseline(&agent.framework);
     let mut findings = Vec::new();
 
     // Autonomy tier assessment (NIST 4-tier)
-    let autonomy_tier = assess_autonomy_tier(agent);
+    let autonomy_tier = signals.autonomy_tier;
     score += (autonomy_tier as i16 - 1) * 10;
 
     // Tool count risk
-    if agent.tools.is_empty() {
+    if signals.tool_count == 0 {
         // No tools detected = might be missing detection, slight risk bump
         score += 5;
-    } else if agent.tools.len() > 10 {
+    } else if signals.tool_count > 10 {
         score += 15;
         findings.push(Finding {
             category: FindingCategory::UnboundedAutonomy,
             severity: Severity::Medium,
-            title: format!("Agent has {} tools", agent.tools.len()),
+            title: format!("Agent has {} tools", signals.tool_count),
             description: "Agents with many tools have a larger attack surface and blast radius.".into(),
             remediation: "Apply principle of least privilege — only grant tools the agent needs for its specific task.".into(),
             framework_ref: framework_reference(compliance_framework, "tool-scope"),
@@ -116,8 +122,7 @@ fn score_single_agent(agent: &DiscoveredAgent, compliance_framework: &Framework)
     }
 
     // Tools without confirmation gates
-    let unconfirmed_tools: Vec<_> = agent.tools.iter().filter(|t| !t.has_confirmation).collect();
-    if !unconfirmed_tools.is_empty() && agent.tools.len() > 3 {
+    if signals.unconfirmed_tool_count > 0 && signals.tool_count > 3 {
         score += 10;
         findings.push(Finding {
             category: FindingCategory::NoHumanOversight,
@@ -125,8 +130,8 @@ fn score_single_agent(agent: &DiscoveredAgent, compliance_framework: &Framework)
             title: "Tools execute without human confirmation".into(),
             description: format!(
                 "{} of {} tools can execute without human approval.",
-                unconfirmed_tools.len(),
-                agent.tools.len()
+                signals.unconfirmed_tool_count,
+                signals.tool_count
             ),
             remediation: "Add human-in-the-loop confirmation for destructive or high-impact tool calls.".into(),
             framework_ref: framework_reference(compliance_framework, "human-oversight"),
@@ -134,7 +139,7 @@ fn score_single_agent(agent: &DiscoveredAgent, compliance_framework: &Framework)
     }
 
     // System prompt analysis
-    if agent.system_prompt.is_none() {
+    if !signals.has_system_prompt {
         score += 10;
         findings.push(Finding {
             category: FindingCategory::PromptInjectionRisk,
@@ -147,9 +152,7 @@ fn score_single_agent(agent: &DiscoveredAgent, compliance_framework: &Framework)
     }
 
     // Guardrail assessment
-    let guardrail_types: Vec<_> = agent.guardrails.iter().map(|g| &g.kind).collect();
-
-    if !guardrail_types.iter().any(|g| matches!(g, GuardrailKind::InputValidation)) {
+    if !signals.guardrails.input_validation {
         score += 10;
         findings.push(Finding {
             category: FindingCategory::MissingGuardrail,
@@ -161,7 +164,7 @@ fn score_single_agent(agent: &DiscoveredAgent, compliance_framework: &Framework)
         });
     }
 
-    if !guardrail_types.iter().any(|g| matches!(g, GuardrailKind::OutputFiltering)) {
+    if !signals.guardrails.output_filtering {
         score += 5;
         findings.push(Finding {
             category: FindingCategory::MissingGuardrail,
@@ -173,7 +176,7 @@ fn score_single_agent(agent: &DiscoveredAgent, compliance_framework: &Framework)
         });
     }
 
-    if !guardrail_types.iter().any(|g| matches!(g, GuardrailKind::RateLimit)) {
+    if !signals.guardrails.rate_limit {
         score += 5;
         findings.push(Finding {
             category: FindingCategory::MissingGuardrail,
@@ -185,10 +188,11 @@ fn score_single_agent(agent: &DiscoveredAgent, compliance_framework: &Framework)
         });
     }
 
-    // Permission assessment
-    let has_exec = agent.permissions.iter().any(|p| matches!(p.level, PermissionLevel::Execute));
-    let has_admin = agent.permissions.iter().any(|p| matches!(p.level, PermissionLevel::Admin));
-    let has_write = agent.permissions.iter().any(|p| matches!(p.level, PermissionLevel::Write));
+    // Permission assessment — bound locally so the permission_summary block
+    // below stays readable.
+    let has_exec = signals.permissions.execute;
+    let has_admin = signals.permissions.admin;
+    let has_write = signals.permissions.write;
 
     if has_exec {
         score += 20;
@@ -215,12 +219,12 @@ fn score_single_agent(agent: &DiscoveredAgent, compliance_framework: &Framework)
     }
 
     // Data access assessment
-    if agent.data_access.len() > 3 {
+    if signals.data_source_count > 3 {
         score += 10;
         findings.push(Finding {
             category: FindingCategory::DataExposure,
             severity: Severity::Medium,
-            title: format!("Agent accesses {} data sources", agent.data_access.len()),
+            title: format!("Agent accesses {} data sources", signals.data_source_count),
             description: "Agent has broad data access across multiple sources, increasing blast radius.".into(),
             remediation: "Restrict data access to only the sources required for the agent's specific function.".into(),
             framework_ref: framework_reference(compliance_framework, "data-access"),
@@ -228,11 +232,7 @@ fn score_single_agent(agent: &DiscoveredAgent, compliance_framework: &Framework)
     }
 
     // No audit trail detection
-    let has_logging = agent.guardrails.iter().any(|g| {
-        g.description.to_lowercase().contains("log")
-            || g.description.to_lowercase().contains("audit")
-    });
-    if !has_logging {
+    if !signals.has_audit_trail {
         score += 5;
         findings.push(Finding {
             category: FindingCategory::MissingAuditTrail,
@@ -282,8 +282,8 @@ fn score_single_agent(agent: &DiscoveredAgent, compliance_framework: &Framework)
         line_number: agent.line_number,
         risk_score: final_score,
         risk_level,
-        tool_count: agent.tools.len(),
-        has_system_prompt: agent.system_prompt.is_some(),
+        tool_count: signals.tool_count,
+        has_system_prompt: signals.has_system_prompt,
         guardrail_count: agent.guardrails.len(),
         permission_summary,
         data_access_summary,
@@ -299,23 +299,6 @@ fn get_framework_baseline(framework_name: &str) -> i16 {
         }
     }
     50 // unknown framework
-}
-
-fn assess_autonomy_tier(agent: &DiscoveredAgent) -> u8 {
-    let has_human_approval = agent.guardrails.iter().any(|g| matches!(g.kind, GuardrailKind::HumanApproval));
-    let has_scope_restriction = agent.guardrails.iter().any(|g| matches!(g.kind, GuardrailKind::ScopeRestriction));
-    let has_exec = agent.permissions.iter().any(|p| matches!(p.level, PermissionLevel::Execute));
-    let tool_count = agent.tools.len();
-
-    if has_human_approval && has_scope_restriction && tool_count <= 3 {
-        1 // Fully supervised
-    } else if has_scope_restriction && !has_exec {
-        2 // Constrained autonomy
-    } else if !has_exec && tool_count < 10 {
-        3 // Broad autonomy with monitoring
-    } else {
-        4 // Full autonomy
-    }
 }
 
 fn framework_reference(framework: &Framework, control: &str) -> String {

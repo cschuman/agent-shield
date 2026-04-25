@@ -77,39 +77,10 @@ pub struct RepoCtx<'a> {
     pub manifest_text: &'a str,
 }
 
-/// The fixed set of v1.0 context signals (round3-synthesis §1.2).
-///
-/// Defined here in W2-C1 so that `Matcher::matches_signals` can evaluate
-/// against them; W2-C2 moves the computation logic and helpers into
-/// `signals.rs` and imports this struct back. Six canonical signals plus
-/// two bonus fields (`unconfirmed_tool_count`, `has_audit_trail`) that
-/// today's `score_single_agent` reads inline — included now because the
-/// scoring rules in W2-C6 will reference them.
-#[derive(Debug, Clone, Default)]
-pub struct ContextSignals {
-    pub tool_count: usize,
-    pub has_system_prompt: bool,
-    pub autonomy_tier: u8,
-    pub data_source_count: usize,
-    pub unconfirmed_tool_count: usize,
-    pub has_audit_trail: bool,
-    pub guardrails: GuardrailFlags,
-    pub permissions: PermissionFlags,
-}
-
-#[derive(Debug, Clone, Copy, Default)]
-pub struct GuardrailFlags {
-    pub input_validation: bool,
-    pub output_filtering: bool,
-    pub rate_limit: bool,
-}
-
-#[derive(Debug, Clone, Copy, Default)]
-pub struct PermissionFlags {
-    pub execute: bool,
-    pub admin: bool,
-    pub write: bool,
-}
+// `ContextSignals`, `GuardrailFlags`, and `PermissionFlags` were defined
+// here in W2-C1 and moved to `crate::signals` in W2-C2. The matcher
+// imports them for the `matches_signals` evaluator below.
+pub use crate::signals::{ContextSignals, GuardrailFlags, PermissionFlags};
 
 /// Comparison operator for a `Matcher::ContextSignal`. `Gt`/`Gte`/`Lt`/`Lte`
 /// are valid only for integer signal values; the loader rejects ordering

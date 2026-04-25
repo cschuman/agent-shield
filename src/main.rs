@@ -4,6 +4,7 @@ mod report;
 mod frameworks;
 mod engine;
 mod rules;
+mod signals;
 
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
