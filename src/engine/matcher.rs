@@ -77,6 +77,65 @@ pub struct RepoCtx<'a> {
     pub manifest_text: &'a str,
 }
 
+/// The fixed set of v1.0 context signals (round3-synthesis §1.2).
+///
+/// Defined here in W2-C1 so that `Matcher::matches_signals` can evaluate
+/// against them; W2-C2 moves the computation logic and helpers into
+/// `signals.rs` and imports this struct back. Six canonical signals plus
+/// two bonus fields (`unconfirmed_tool_count`, `has_audit_trail`) that
+/// today's `score_single_agent` reads inline — included now because the
+/// scoring rules in W2-C6 will reference them.
+#[derive(Debug, Clone, Default)]
+pub struct ContextSignals {
+    pub tool_count: usize,
+    pub has_system_prompt: bool,
+    pub autonomy_tier: u8,
+    pub data_source_count: usize,
+    pub unconfirmed_tool_count: usize,
+    pub has_audit_trail: bool,
+    pub guardrails: GuardrailFlags,
+    pub permissions: PermissionFlags,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct GuardrailFlags {
+    pub input_validation: bool,
+    pub output_filtering: bool,
+    pub rate_limit: bool,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct PermissionFlags {
+    pub execute: bool,
+    pub admin: bool,
+    pub write: bool,
+}
+
+/// Comparison operator for a `Matcher::ContextSignal`. `Gt`/`Gte`/`Lt`/`Lte`
+/// are valid only for integer signal values; the loader rejects ordering
+/// ops on bool/string values.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SignalOp {
+    Eq,
+    Ne,
+    Gt,
+    Gte,
+    Lt,
+    Lte,
+}
+
+/// Literal value a context signal is compared against.
+///
+/// Variants match the YAML side (`bool`/`integer`/`string`) — the loader
+/// validates that the literal type makes sense for the signal name (e.g.
+/// `has_system_prompt` → `Bool`, `tool_count` → `Int`).
+#[derive(Debug, Clone, PartialEq)]
+pub enum SignalValue {
+    Bool(bool),
+    Int(i64),
+    Str(String),
+}
+
 /// The closed set of detection primitives.
 ///
 /// Three text-level primitives operate on a single file's content; two
@@ -123,6 +182,16 @@ pub enum Matcher {
     /// non-empty hits → empty. Used by behavioral rules like
     /// "multi-agent without human approval guardrail."
     Not(Box<Matcher>),
+    /// Compares a v1.0 context signal to a literal value. Evaluated by
+    /// `matches_signals`; file/repo passes return empty for this variant.
+    /// `param` is required for `has_guardrail` / `has_permission` and
+    /// ignored for the others (the loader enforces this).
+    ContextSignal {
+        name: String,
+        param: Option<String>,
+        op: SignalOp,
+        value: SignalValue,
+    },
 }
 
 impl Matcher {
@@ -177,7 +246,9 @@ impl Matcher {
                     Vec::new()
                 }
             }
-            Matcher::PackageDep { .. } | Matcher::FilePresent { .. } => Vec::new(),
+            Matcher::PackageDep { .. }
+            | Matcher::FilePresent { .. }
+            | Matcher::ContextSignal { .. } => Vec::new(),
             Matcher::AllOf(children) => {
                 let per_child: Vec<Vec<MatchHit>> =
                     children.iter().map(|c| c.matches_file(ctx)).collect();
@@ -231,7 +302,8 @@ impl Matcher {
             }
             Matcher::ImportContains { .. }
             | Matcher::CodeRegex { .. }
-            | Matcher::MultilineRegex { .. } => Vec::new(),
+            | Matcher::MultilineRegex { .. }
+            | Matcher::ContextSignal { .. } => Vec::new(),
             Matcher::AllOf(children) => {
                 let per_child: Vec<Vec<MatchHit>> =
                     children.iter().map(|c| c.matches_repo(ctx)).collect();
@@ -256,5 +328,330 @@ impl Matcher {
                 }
             }
         }
+    }
+
+    /// Evaluate against a `ContextSignals` snapshot. Used by scoring rules
+    /// (Tier-2) — file/repo primitives return empty here, so a
+    /// `ContextSignal` matcher inside an `AllOf` with a `CodeRegex` will
+    /// silently never fire (the loader rejects this kind of cross-pass
+    /// composition for scoring rules).
+    pub fn matches_signals(&self, signals: &ContextSignals) -> Vec<MatchHit> {
+        match self {
+            Matcher::ContextSignal {
+                name,
+                param,
+                op,
+                value,
+            } => evaluate_context_signal(name, param.as_deref(), *op, value, signals),
+            Matcher::ImportContains { .. }
+            | Matcher::CodeRegex { .. }
+            | Matcher::MultilineRegex { .. }
+            | Matcher::PackageDep { .. }
+            | Matcher::FilePresent { .. } => Vec::new(),
+            Matcher::AllOf(children) => {
+                let per_child: Vec<Vec<MatchHit>> =
+                    children.iter().map(|c| c.matches_signals(signals)).collect();
+                if per_child.iter().all(|hits| !hits.is_empty()) {
+                    per_child.into_iter().flatten().collect()
+                } else {
+                    Vec::new()
+                }
+            }
+            Matcher::AnyOf(children) => children
+                .iter()
+                .flat_map(|c| c.matches_signals(signals))
+                .collect(),
+            Matcher::Not(inner) => {
+                if inner.matches_signals(signals).is_empty() {
+                    vec![MatchHit {
+                        line: 0,
+                        snippet: "negated signal condition holds".to_string(),
+                    }]
+                } else {
+                    Vec::new()
+                }
+            }
+        }
+    }
+}
+
+/// Resolve a (signal_name, param, op, value) tuple against the current
+/// `ContextSignals`. Returns one synthetic `MatchHit` if the comparison
+/// holds, empty otherwise. Unknown signal names return empty (defensive
+/// — the loader pre-validates against the v1 allowlist, but we don't trust
+/// it inside the matcher).
+fn evaluate_context_signal(
+    name: &str,
+    param: Option<&str>,
+    op: SignalOp,
+    value: &SignalValue,
+    signals: &ContextSignals,
+) -> Vec<MatchHit> {
+    let result = match name {
+        "tool_count" => compare_int(signals.tool_count as i64, op, value),
+        "autonomy_tier" => compare_int(signals.autonomy_tier as i64, op, value),
+        "data_source_count" => compare_int(signals.data_source_count as i64, op, value),
+        "unconfirmed_tool_count" => compare_int(signals.unconfirmed_tool_count as i64, op, value),
+        "has_system_prompt" => compare_bool(signals.has_system_prompt, op, value),
+        "has_audit_trail" => compare_bool(signals.has_audit_trail, op, value),
+        "has_guardrail" => match param {
+            Some("input_validation") => compare_bool(signals.guardrails.input_validation, op, value),
+            Some("output_filtering") => compare_bool(signals.guardrails.output_filtering, op, value),
+            Some("rate_limit") => compare_bool(signals.guardrails.rate_limit, op, value),
+            _ => false,
+        },
+        "has_permission" => match param {
+            Some("execute") => compare_bool(signals.permissions.execute, op, value),
+            Some("admin") => compare_bool(signals.permissions.admin, op, value),
+            Some("write") => compare_bool(signals.permissions.write, op, value),
+            _ => false,
+        },
+        _ => false,
+    };
+    if result {
+        vec![MatchHit {
+            line: 0,
+            snippet: format!(
+                "signal {}{} {:?} {:?}",
+                name,
+                param.map(|p| format!("[{}]", p)).unwrap_or_default(),
+                op,
+                value
+            ),
+        }]
+    } else {
+        Vec::new()
+    }
+}
+
+fn compare_int(actual: i64, op: SignalOp, expected: &SignalValue) -> bool {
+    let SignalValue::Int(rhs) = expected else {
+        return false;
+    };
+    match op {
+        SignalOp::Eq => actual == *rhs,
+        SignalOp::Ne => actual != *rhs,
+        SignalOp::Gt => actual > *rhs,
+        SignalOp::Gte => actual >= *rhs,
+        SignalOp::Lt => actual < *rhs,
+        SignalOp::Lte => actual <= *rhs,
+    }
+}
+
+fn compare_bool(actual: bool, op: SignalOp, expected: &SignalValue) -> bool {
+    let SignalValue::Bool(rhs) = expected else {
+        return false;
+    };
+    match op {
+        SignalOp::Eq => actual == *rhs,
+        SignalOp::Ne => actual != *rhs,
+        // Ordering ops on bool are loader-rejected; defensive false here.
+        SignalOp::Gt | SignalOp::Gte | SignalOp::Lt | SignalOp::Lte => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn signals_with_tools(n: usize) -> ContextSignals {
+        ContextSignals {
+            tool_count: n,
+            ..Default::default()
+        }
+    }
+
+    fn cs(name: &str, op: SignalOp, value: SignalValue) -> Matcher {
+        Matcher::ContextSignal {
+            name: name.to_string(),
+            param: None,
+            op,
+            value,
+        }
+    }
+
+    fn cs_param(name: &str, param: &str, op: SignalOp, value: SignalValue) -> Matcher {
+        Matcher::ContextSignal {
+            name: name.to_string(),
+            param: Some(param.to_string()),
+            op,
+            value,
+        }
+    }
+
+    #[test]
+    fn integer_signal_eq_ne_ordering() {
+        let signals = signals_with_tools(11);
+        // 11 != 10
+        assert!(cs("tool_count", SignalOp::Eq, SignalValue::Int(10))
+            .matches_signals(&signals)
+            .is_empty());
+        // 11 > 10
+        assert!(!cs("tool_count", SignalOp::Gt, SignalValue::Int(10))
+            .matches_signals(&signals)
+            .is_empty());
+        // 11 >= 11
+        assert!(!cs("tool_count", SignalOp::Gte, SignalValue::Int(11))
+            .matches_signals(&signals)
+            .is_empty());
+        // 11 not < 11
+        assert!(cs("tool_count", SignalOp::Lt, SignalValue::Int(11))
+            .matches_signals(&signals)
+            .is_empty());
+        // 11 != 10
+        assert!(!cs("tool_count", SignalOp::Ne, SignalValue::Int(10))
+            .matches_signals(&signals)
+            .is_empty());
+    }
+
+    #[test]
+    fn bool_signal_eq_ne() {
+        let signals = ContextSignals {
+            has_system_prompt: false,
+            ..Default::default()
+        };
+        assert!(!cs("has_system_prompt", SignalOp::Eq, SignalValue::Bool(false))
+            .matches_signals(&signals)
+            .is_empty());
+        assert!(cs("has_system_prompt", SignalOp::Eq, SignalValue::Bool(true))
+            .matches_signals(&signals)
+            .is_empty());
+    }
+
+    #[test]
+    fn bool_signal_rejects_ordering_ops() {
+        let signals = ContextSignals {
+            has_system_prompt: true,
+            ..Default::default()
+        };
+        // Ordering on bool returns empty (defensive — loader rejects this).
+        assert!(cs("has_system_prompt", SignalOp::Gt, SignalValue::Bool(false))
+            .matches_signals(&signals)
+            .is_empty());
+    }
+
+    #[test]
+    fn parametrized_guardrail_signal() {
+        let signals = ContextSignals {
+            guardrails: GuardrailFlags {
+                input_validation: true,
+                output_filtering: false,
+                rate_limit: false,
+            },
+            ..Default::default()
+        };
+        assert!(!cs_param(
+            "has_guardrail",
+            "input_validation",
+            SignalOp::Eq,
+            SignalValue::Bool(true)
+        )
+        .matches_signals(&signals)
+        .is_empty());
+        assert!(!cs_param(
+            "has_guardrail",
+            "output_filtering",
+            SignalOp::Eq,
+            SignalValue::Bool(false)
+        )
+        .matches_signals(&signals)
+        .is_empty());
+    }
+
+    #[test]
+    fn parametrized_permission_signal() {
+        let signals = ContextSignals {
+            permissions: PermissionFlags {
+                execute: true,
+                admin: false,
+                write: true,
+            },
+            ..Default::default()
+        };
+        assert!(!cs_param(
+            "has_permission",
+            "execute",
+            SignalOp::Eq,
+            SignalValue::Bool(true)
+        )
+        .matches_signals(&signals)
+        .is_empty());
+        assert!(cs_param(
+            "has_permission",
+            "admin",
+            SignalOp::Eq,
+            SignalValue::Bool(true)
+        )
+        .matches_signals(&signals)
+        .is_empty());
+    }
+
+    #[test]
+    fn unknown_signal_name_is_empty_defensively() {
+        let signals = ContextSignals::default();
+        assert!(cs("not_a_real_signal", SignalOp::Eq, SignalValue::Bool(true))
+            .matches_signals(&signals)
+            .is_empty());
+    }
+
+    #[test]
+    fn missing_param_for_parametrized_signal_is_empty() {
+        let signals = ContextSignals {
+            guardrails: GuardrailFlags {
+                input_validation: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        // No param provided — defensive empty (loader rejects this shape).
+        assert!(cs("has_guardrail", SignalOp::Eq, SignalValue::Bool(true))
+            .matches_signals(&signals)
+            .is_empty());
+    }
+
+    #[test]
+    fn combinators_compose_over_signals() {
+        let signals = ContextSignals {
+            tool_count: 12,
+            has_system_prompt: false,
+            ..Default::default()
+        };
+        let any = Matcher::AnyOf(vec![
+            cs("tool_count", SignalOp::Lt, SignalValue::Int(5)),
+            cs("has_system_prompt", SignalOp::Eq, SignalValue::Bool(false)),
+        ]);
+        assert!(!any.matches_signals(&signals).is_empty());
+
+        let all = Matcher::AllOf(vec![
+            cs("tool_count", SignalOp::Gt, SignalValue::Int(10)),
+            cs("has_system_prompt", SignalOp::Eq, SignalValue::Bool(false)),
+        ]);
+        assert!(!all.matches_signals(&signals).is_empty());
+
+        let not = Matcher::Not(Box::new(cs(
+            "tool_count",
+            SignalOp::Lt,
+            SignalValue::Int(5),
+        )));
+        assert!(!not.matches_signals(&signals).is_empty());
+    }
+
+    #[test]
+    fn file_and_repo_passes_skip_context_signal() {
+        // Defensive: ContextSignal must return empty from file/repo passes
+        // even if it's nested inside a combinator.
+        let m = cs("tool_count", SignalOp::Gt, SignalValue::Int(0));
+        let ctx = FileCtx {
+            path: std::path::Path::new("x.rs"),
+            lang: Lang::Rust,
+            content: "irrelevant",
+        };
+        assert!(m.matches_file(&ctx).is_empty());
+
+        let repo_ctx = RepoCtx {
+            root: std::path::Path::new("."),
+            manifest_text: "",
+        };
+        assert!(m.matches_repo(&repo_ctx).is_empty());
     }
 }

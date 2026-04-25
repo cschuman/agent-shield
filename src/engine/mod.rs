@@ -211,6 +211,10 @@ pub fn describe_matcher(m: &Matcher) -> Vec<String> {
             .into_iter()
             .map(|s| format!("not({})", s))
             .collect(),
+        Matcher::ContextSignal { name, param, op, value } => {
+            let p = param.as_deref().map(|p| format!("[{}]", p)).unwrap_or_default();
+            vec![format!("signal: {}{} {:?} {:?}", name, p, op, value)]
+        }
     }
 }
 
