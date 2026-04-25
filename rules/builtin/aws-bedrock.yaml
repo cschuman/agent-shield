@@ -1,0 +1,14 @@
+schema_version: "1.0"
+id: "framework/aws-bedrock/agent-detected"
+category: detection
+severity: high
+description: "AWS Bedrock Agent usage detected"
+framework: AWSBedrock
+min_match_count: 1
+extends: null
+when:
+  any_of:
+    - code_regex: 'bedrock-agent'
+    - code_regex: 'BedrockAgent'
+    - code_regex: 'bedrock_agent'
+    - import_contains: "@aws-sdk/client-bedrock-agent"

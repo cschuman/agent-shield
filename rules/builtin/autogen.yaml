@@ -1,0 +1,14 @@
+schema_version: "1.0"
+id: "framework/autogen/agent-detected"
+category: detection
+severity: high
+description: "Microsoft AutoGen agent detected"
+framework: AutoGen
+min_match_count: 1
+extends: null
+when:
+  any_of:
+    - import_contains: "autogen"
+    - import_contains: "from autogen"
+    - package_dep: "autogen"
+    - package_dep: "pyautogen"

@@ -1,0 +1,14 @@
+schema_version: "1.0"
+id: "framework/langchain/agent-detected"
+category: detection
+severity: high
+description: "LangChain agent or chain detected"
+framework: LangChain
+min_match_count: 1
+extends: null
+when:
+  any_of:
+    - import_contains: "langchain"
+    - import_contains: "from langchain"
+    - package_dep: "langchain"
+    - package_dep: "@langchain/core"

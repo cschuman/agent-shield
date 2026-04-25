@@ -1,0 +1,13 @@
+schema_version: "1.0"
+id: "framework/anthropic-agent-sdk/agent-detected"
+category: detection
+severity: high
+description: "Anthropic Agent SDK usage detected"
+framework: AnthropicAgentSDK
+min_match_count: 1
+extends: null
+when:
+  any_of:
+    - import_contains: "claude_agent_sdk"
+    - import_contains: "@anthropic-ai/agent-sdk"
+    - package_dep: "claude-agent-sdk"

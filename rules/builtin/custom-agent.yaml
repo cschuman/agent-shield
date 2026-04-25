@@ -1,0 +1,13 @@
+schema_version: "1.0"
+id: "framework/custom-agent/agent-detected"
+category: detection
+severity: high
+description: "Custom or hand-rolled agent loop detected"
+framework: CustomAgent
+min_match_count: 2
+extends: null
+when:
+  any_of:
+    - code_regex: '(?:system_prompt|systemPrompt)\s*[=:]'
+    - code_regex: '(?:tool_call|toolCall|function_call)\s*[=:\(]'
+    - code_regex: 'agent[_.](?:loop|run|execute|step)\s*\('

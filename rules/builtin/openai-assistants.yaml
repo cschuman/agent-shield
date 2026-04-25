@@ -1,0 +1,14 @@
+schema_version: "1.0"
+id: "framework/openai-assistants/agent-detected"
+category: detection
+severity: high
+description: "OpenAI Assistants API usage detected"
+framework: OpenAIAssistants
+min_match_count: 1
+extends: null
+when:
+  any_of:
+    - code_regex: 'client\.beta\.assistants'
+    - code_regex: 'openai\.beta\.assistants'
+    - code_regex: 'assistants\.create'
+    - code_regex: 'type.*=.*"assistant"'

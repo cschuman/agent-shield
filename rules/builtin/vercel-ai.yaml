@@ -1,0 +1,16 @@
+schema_version: "1.0"
+id: "framework/vercel-ai/agent-detected"
+category: detection
+severity: high
+description: "Vercel AI SDK agent or tool usage detected"
+framework: VercelAI
+min_match_count: 2
+extends: null
+when:
+  any_of:
+    - import_contains: "ai/"
+    - import_contains: "from 'ai'"
+    - import_contains: "from \"ai\""
+    - code_regex: '\bgenerateText\s*\('
+    - code_regex: '\bstreamText\s*\('
+    - code_regex: '\btool\s*\(\s*\{'

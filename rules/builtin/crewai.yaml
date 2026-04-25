@@ -1,0 +1,13 @@
+schema_version: "1.0"
+id: "framework/crewai/agent-detected"
+category: detection
+severity: high
+description: "CrewAI multi-agent crew detected"
+framework: CrewAI
+min_match_count: 1
+extends: null
+when:
+  any_of:
+    - import_contains: "crewai"
+    - import_contains: "from crewai"
+    - package_dep: "crewai"

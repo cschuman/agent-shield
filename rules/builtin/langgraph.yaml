@@ -1,0 +1,14 @@
+schema_version: "1.0"
+id: "framework/langgraph/agent-detected"
+category: detection
+severity: high
+description: "LangGraph agent graph detected"
+framework: LangGraph
+min_match_count: 1
+extends: null
+when:
+  any_of:
+    - import_contains: "langgraph"
+    - import_contains: "from langgraph"
+    - package_dep: "langgraph"
+    - package_dep: "@langchain/langgraph"

@@ -1,0 +1,16 @@
+schema_version: "1.0"
+id: "framework/anthropic-mcp/agent-detected"
+category: detection
+severity: high
+description: "Anthropic Model Context Protocol server or client detected"
+framework: AnthropicMCP
+min_match_count: 1
+extends: null
+when:
+  any_of:
+    - import_contains: "@modelcontextprotocol"
+    - import_contains: "mcp"
+    - file_present: "mcp.json"
+    - file_present: ".mcp.json"
+    - code_regex: 'McpServer'
+    - code_regex: 'mcp_server'
