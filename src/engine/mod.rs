@@ -11,8 +11,7 @@
 pub mod matcher;
 
 use crate::frameworks::AgentFramework;
-use matcher::{LangSet, Matcher};
-use regex::Regex;
+use matcher::Matcher;
 
 /// A single compiled detection rule.
 ///
@@ -76,31 +75,14 @@ impl Engine {
     ///
     /// At the file pass, `PackageDep` and `FilePresent` matchers return zero
     /// hits, so the legacy "Import + CodePattern only contribute to firing"
-    /// behavior is preserved exactly. In Week 2 this method is replaced by
-    /// a YAML loader; the return type stays the same.
+    /// behavior is preserved exactly.
+    ///
+    /// As of W2-C5 this is a thin wrapper over `compile_yaml(EMBEDDED_DETECTION_RULES)`.
+    /// The hardcoded matcher tree is gone; rule definitions live in
+    /// `rules/builtin/*.yaml`. Adding a framework now means: enum variant
+    /// + YAML file + EMBEDDED_DETECTION_RULES entry.
     pub fn compile_builtin() -> Self {
-        let frameworks = AgentFramework::all();
-        let mut rules = Vec::with_capacity(frameworks.len());
-
-        for fw in frameworks {
-            let sub_matchers = builtin_matchers_for(&fw);
-            let min_match_count: u8 = match fw {
-                AgentFramework::VercelAI | AgentFramework::CustomAgent => 2,
-                _ => 1,
-            };
-
-            rules.push(CompiledRule {
-                id: format!("framework/{}/agent-detected", framework_slug(&fw)),
-                framework: fw,
-                matcher: Matcher::AnyOf(sub_matchers),
-                min_match_count,
-                extends: None,
-            });
-        }
-
-        Self {
-            rules: CompiledRuleSet { rules },
-        }
+        Self::compile_yaml(EMBEDDED_DETECTION_RULES)
     }
 
     /// Compile from a bundle of `(source_key, yaml_text)` pairs.
@@ -141,11 +123,10 @@ impl Engine {
 
 /// Bundled detection rules — concatenated at build time via `include_str!`.
 ///
-/// Order matches `framework_slug` traversal of `AgentFramework::all()` so
-/// the structural-equivalence test against `compile_builtin` doesn't need
-/// to sort. When adding a framework: add the variant to `AgentFramework`,
-/// the slug to `framework_slug`, the YAML file to `rules/builtin/`, and a
-/// new entry here in the same position.
+/// Order matches the variant order of `AgentFramework::all()` so users
+/// reading rule IDs can predict scan output without grepping a slug map.
+/// When adding a framework: add the variant to `AgentFramework`, the YAML
+/// file to `rules/builtin/`, and a new entry here in the same position.
 pub const EMBEDDED_DETECTION_RULES: &[(&str, &str)] = &[
     ("langchain", include_str!("../../rules/builtin/langchain.yaml")),
     ("langgraph", include_str!("../../rules/builtin/langgraph.yaml")),
@@ -174,91 +155,6 @@ pub const EMBEDDED_DETECTION_RULES: &[(&str, &str)] = &[
     ),
 ];
 
-/// The hardcoded primitive set per framework — Week-1 home for what becomes
-/// YAML rule files in Week 2. Kept terse on purpose: each line maps to a
-/// future `match: { ... }` clause in the rule schema.
-fn builtin_matchers_for(fw: &AgentFramework) -> Vec<Matcher> {
-    let import = |s: &str| Matcher::ImportContains {
-        needle: s.to_string(),
-        languages: LangSet::Any,
-    };
-    let code = |p: &str| Matcher::CodeRegex {
-        pattern: Regex::new(p)
-            .unwrap_or_else(|e| panic!("invalid regex in built-in rule {:?}: {}", p, e)),
-        languages: LangSet::Any,
-    };
-    let pkg = |s: &str| Matcher::PackageDep {
-        name: s.to_string(),
-    };
-    let cfg = |s: &str| Matcher::FilePresent {
-        path: s.to_string(),
-    };
-
-    match fw {
-        AgentFramework::LangChain => vec![
-            import("langchain"),
-            import("from langchain"),
-            pkg("langchain"),
-            pkg("@langchain/core"),
-        ],
-        AgentFramework::LangGraph => vec![
-            import("langgraph"),
-            import("from langgraph"),
-            pkg("langgraph"),
-            pkg("@langchain/langgraph"),
-        ],
-        AgentFramework::CrewAI => vec![
-            import("crewai"),
-            import("from crewai"),
-            pkg("crewai"),
-        ],
-        AgentFramework::AutoGen => vec![
-            import("autogen"),
-            import("from autogen"),
-            pkg("autogen"),
-            pkg("pyautogen"),
-        ],
-        AgentFramework::OpenAIAssistants => vec![
-            code(r"client\.beta\.assistants"),
-            code(r"openai\.beta\.assistants"),
-            code(r"assistants\.create"),
-            code(r#"type.*=.*"assistant""#),
-        ],
-        AgentFramework::AnthropicMCP => vec![
-            import("@modelcontextprotocol"),
-            import("mcp"),
-            cfg("mcp.json"),
-            cfg(".mcp.json"),
-            code(r"McpServer"),
-            code(r"mcp_server"),
-        ],
-        AgentFramework::AnthropicAgentSDK => vec![
-            import("claude_agent_sdk"),
-            import("@anthropic-ai/agent-sdk"),
-            pkg("claude-agent-sdk"),
-        ],
-        AgentFramework::AWSBedrock => vec![
-            code(r"bedrock-agent"),
-            code(r"BedrockAgent"),
-            code(r"bedrock_agent"),
-            import("@aws-sdk/client-bedrock-agent"),
-        ],
-        AgentFramework::VercelAI => vec![
-            import("ai/"),
-            import("from 'ai'"),
-            import("from \"ai\""),
-            code(r"\bgenerateText\s*\("),
-            code(r"\bstreamText\s*\("),
-            code(r"\btool\s*\(\s*\{"),
-        ],
-        AgentFramework::CustomAgent => vec![
-            code(r"(?:system_prompt|systemPrompt)\s*[=:]"),
-            code(r"(?:tool_call|toolCall|function_call)\s*[=:\(]"),
-            code(r"agent[_.](?:loop|run|execute|step)\s*\("),
-        ],
-    }
-}
-
 /// Flatten a `Matcher` tree into human-readable descriptors, preserving the
 /// declaration order of `AnyOf`/`AllOf` children.
 ///
@@ -285,21 +181,6 @@ pub fn describe_matcher(m: &Matcher) -> Vec<String> {
             let p = param.as_deref().map(|p| format!("[{}]", p)).unwrap_or_default();
             vec![format!("signal: {}{} {:?} {:?}", name, p, op, value)]
         }
-    }
-}
-
-fn framework_slug(fw: &AgentFramework) -> &'static str {
-    match fw {
-        AgentFramework::LangChain => "langchain",
-        AgentFramework::LangGraph => "langgraph",
-        AgentFramework::CrewAI => "crewai",
-        AgentFramework::AutoGen => "autogen",
-        AgentFramework::OpenAIAssistants => "openai-assistants",
-        AgentFramework::AnthropicMCP => "anthropic-mcp",
-        AgentFramework::AnthropicAgentSDK => "anthropic-agent-sdk",
-        AgentFramework::AWSBedrock => "aws-bedrock",
-        AgentFramework::VercelAI => "vercel-ai",
-        AgentFramework::CustomAgent => "custom-agent",
     }
 }
 
@@ -363,40 +244,4 @@ mod tests {
         assert_eq!(engine.rules.rules.len(), AgentFramework::all().len());
     }
 
-    /// Structural equivalence: `compile_yaml(EMBEDDED_DETECTION_RULES)` must
-    /// produce a rule set semantically identical to `compile_builtin()`.
-    /// Same rule IDs, same frameworks, same min_match_count, same matcher
-    /// tree shape. We compare via Debug-print of matchers because Regex
-    /// doesn't implement PartialEq — Debug includes the pattern source
-    /// which is the structural property we care about.
-    #[test]
-    fn yaml_matches_compile_builtin_structurally() {
-        let from_code = Engine::compile_builtin();
-        let from_yaml = Engine::compile_yaml(EMBEDDED_DETECTION_RULES);
-        assert_eq!(
-            from_code.rules.rules.len(),
-            from_yaml.rules.rules.len(),
-            "rule count drift"
-        );
-        for (a, b) in from_code
-            .rules
-            .rules
-            .iter()
-            .zip(from_yaml.rules.rules.iter())
-        {
-            assert_eq!(a.id, b.id, "rule id drift");
-            assert_eq!(a.framework, b.framework, "framework drift for {}", a.id);
-            assert_eq!(
-                a.min_match_count, b.min_match_count,
-                "min_match_count drift for {}",
-                a.id
-            );
-            assert_eq!(
-                format!("{:?}", a.matcher),
-                format!("{:?}", b.matcher),
-                "matcher tree drift for {}",
-                a.id
-            );
-        }
-    }
 }
