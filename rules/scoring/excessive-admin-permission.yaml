@@ -1,0 +1,20 @@
+schema_version: "1.0"
+id: "scoring/excessive-admin-permission"
+category: excessive_permission
+severity: critical
+description: "Agent operates with elevated/admin privileges."
+title: "Agent has admin-level permissions"
+remediation: "Apply principle of least privilege. Run agents with minimal required permissions."
+when:
+  context_signal:
+    name: has_permission
+    param: admin
+    op: eq
+    value: true
+score_adjustment: 15
+compliance:
+  nist_ai_rmf:   ["NIST AI RMF: GOVERN 1.7, MANAGE 4.1"]
+  iso_42001:     ["ISO/IEC 42001"]
+  eu_ai_act:     ["EU AI Act"]
+  owasp_agentic: ["OWASP Agentic Top 10"]
+extends: null

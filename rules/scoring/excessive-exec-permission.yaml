@@ -1,0 +1,20 @@
+schema_version: "1.0"
+id: "scoring/excessive-exec-permission"
+category: excessive_permission
+severity: critical
+description: "Agent has access to system command execution (subprocess, shell, exec)."
+title: "Agent can execute system commands"
+remediation: "Remove system command access unless absolutely required. If required, implement strict allowlisting."
+when:
+  context_signal:
+    name: has_permission
+    param: execute
+    op: eq
+    value: true
+score_adjustment: 20
+compliance:
+  nist_ai_rmf:   ["NIST AI RMF: GOVERN 1.7, MAP 3.4"]
+  iso_42001:     ["ISO/IEC 42001"]
+  eu_ai_act:     ["EU AI Act"]
+  owasp_agentic: ["OWASP Agentic: A01 Excessive Agency"]
+extends: null

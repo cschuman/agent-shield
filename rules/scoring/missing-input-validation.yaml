@@ -1,0 +1,20 @@
+schema_version: "1.0"
+id: "scoring/missing-input-validation"
+category: missing_guardrail
+severity: high
+description: "Agent does not appear to validate or sanitize inputs before processing."
+title: "No input validation detected"
+remediation: "Implement input validation and sanitization to prevent prompt injection attacks."
+when:
+  context_signal:
+    name: has_guardrail
+    param: input_validation
+    op: eq
+    value: false
+score_adjustment: 10
+compliance:
+  nist_ai_rmf:   ["NIST AI RMF: MANAGE 2.2, MEASURE 2.5"]
+  iso_42001:     ["ISO 42001: A.6.2.6 Data quality"]
+  eu_ai_act:     ["EU AI Act"]
+  owasp_agentic: ["OWASP Agentic: A02 Inadequate Sandboxing"]
+extends: null

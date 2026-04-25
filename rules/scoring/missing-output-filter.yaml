@@ -1,0 +1,20 @@
+schema_version: "1.0"
+id: "scoring/missing-output-filter"
+category: missing_guardrail
+severity: medium
+description: "Agent outputs are not filtered for sensitive data, PII, or inappropriate content."
+title: "No output filtering detected"
+remediation: "Add output filtering to prevent data leakage and inappropriate responses."
+when:
+  context_signal:
+    name: has_guardrail
+    param: output_filtering
+    op: eq
+    value: false
+score_adjustment: 5
+compliance:
+  nist_ai_rmf:   ["NIST AI RMF: MANAGE 2.3, MEASURE 2.7"]
+  iso_42001:     ["ISO 42001: A.6.2.7 Output management"]
+  eu_ai_act:     ["EU AI Act"]
+  owasp_agentic: ["OWASP Agentic Top 10"]
+extends: null

@@ -1,0 +1,24 @@
+schema_version: "1.0"
+id: "scoring/unconfirmed-tools"
+category: no_human_oversight
+severity: high
+description: "{unconfirmed_tool_count} of {tool_count} tools can execute without human approval."
+title: "Tools execute without human confirmation"
+remediation: "Add human-in-the-loop confirmation for destructive or high-impact tool calls."
+when:
+  all_of:
+    - context_signal:
+        name: unconfirmed_tool_count
+        op: gt
+        value: 0
+    - context_signal:
+        name: tool_count
+        op: gt
+        value: 3
+score_adjustment: 10
+compliance:
+  nist_ai_rmf:   ["NIST AI RMF: GOVERN 1.3, MANAGE 2.4"]
+  iso_42001:     ["ISO 42001: A.8.4 Human oversight"]
+  eu_ai_act:     ["EU AI Act: Article 14 Human oversight"]
+  owasp_agentic: ["OWASP Agentic Top 10"]
+extends: null

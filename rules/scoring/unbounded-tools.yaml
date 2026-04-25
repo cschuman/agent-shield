@@ -1,0 +1,19 @@
+schema_version: "1.0"
+id: "scoring/unbounded-tools"
+category: unbounded_autonomy
+severity: medium
+description: "Agents with many tools have a larger attack surface and blast radius."
+title: "Agent has {tool_count} tools"
+remediation: "Apply principle of least privilege — only grant tools the agent needs for its specific task."
+when:
+  context_signal:
+    name: tool_count
+    op: gt
+    value: 10
+score_adjustment: 15
+compliance:
+  nist_ai_rmf:   ["NIST AI RMF: MAP 1.1, MANAGE 2.2"]
+  iso_42001:     ["ISO/IEC 42001"]
+  eu_ai_act:     ["EU AI Act"]
+  owasp_agentic: ["OWASP Agentic: A01 Excessive Agency"]
+extends: null

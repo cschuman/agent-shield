@@ -1,0 +1,12 @@
+schema_version: "1.0"
+id: "scoring/empty-tools"
+category: detection_uncertainty
+severity: low
+description: "No tools detected on agent — possible scanner blind spot"
+when:
+  context_signal:
+    name: tool_count
+    op: eq
+    value: 0
+score_adjustment: 5
+extends: null

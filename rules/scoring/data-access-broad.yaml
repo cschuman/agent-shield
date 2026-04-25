@@ -1,0 +1,19 @@
+schema_version: "1.0"
+id: "scoring/data-access-broad"
+category: data_exposure
+severity: medium
+description: "Agent has broad data access across multiple sources, increasing blast radius."
+title: "Agent accesses {data_source_count} data sources"
+remediation: "Restrict data access to only the sources required for the agent's specific function."
+when:
+  context_signal:
+    name: data_source_count
+    op: gt
+    value: 3
+score_adjustment: 10
+compliance:
+  nist_ai_rmf:   ["NIST AI RMF: MAP 5.1, MANAGE 2.2"]
+  iso_42001:     ["ISO/IEC 42001"]
+  eu_ai_act:     ["EU AI Act: Article 10 Data governance"]
+  owasp_agentic: ["OWASP Agentic Top 10"]
+extends: null

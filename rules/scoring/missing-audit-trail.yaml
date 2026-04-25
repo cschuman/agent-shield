@@ -1,0 +1,19 @@
+schema_version: "1.0"
+id: "scoring/missing-audit-trail"
+category: missing_audit_trail
+severity: medium
+description: "Agent actions are not logged for audit or forensic purposes."
+title: "No audit trail detected"
+remediation: "Implement comprehensive logging of all agent decisions, tool calls, and outputs."
+when:
+  context_signal:
+    name: has_audit_trail
+    op: eq
+    value: false
+score_adjustment: 5
+compliance:
+  nist_ai_rmf:   ["NIST AI RMF: GOVERN 1.5, MEASURE 4.1"]
+  iso_42001:     ["ISO 42001: A.8.5 Logging and monitoring"]
+  eu_ai_act:     ["EU AI Act: Article 12 Record-keeping"]
+  owasp_agentic: ["OWASP Agentic Top 10"]
+extends: null
