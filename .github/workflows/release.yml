@@ -1,0 +1,143 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build artifacts but skip GitHub Release publish"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            archive_suffix: x86_64-linux.tar.gz
+          - target: x86_64-apple-darwin
+            os: macos-13
+            archive_suffix: x86_64-darwin.tar.gz
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            archive_suffix: aarch64-darwin.tar.gz
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: release-${{ matrix.target }}
+
+      - name: Resolve version tag
+        id: version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            tag="${GITHUB_REF#refs/tags/}"
+          else
+            tag="dev-${GITHUB_SHA::7}"
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
+      - name: cargo build --release
+        run: cargo build --release --target ${{ matrix.target }} --locked
+
+      - name: Stage archive contents
+        shell: bash
+        run: |
+          stage="agent-shield-${{ steps.version.outputs.tag }}-${{ matrix.archive_suffix }}"
+          stage="${stage%.tar.gz}"
+          mkdir -p "dist/${stage}"
+          cp "target/${{ matrix.target }}/release/agent-shield" "dist/${stage}/"
+          cp LICENSE README.md CHANGELOG.md "dist/${stage}/"
+          echo "stage=${stage}" >> "$GITHUB_ENV"
+
+      - name: Create tarball
+        shell: bash
+        working-directory: dist
+        run: tar -czf "${stage}.tar.gz" "${stage}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.stage }}
+          path: dist/${{ env.stage }}.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version tag
+        id: version
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          version="${tag#v}"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Generate SHA256SUMS
+        working-directory: dist
+        run: |
+          sha256sum *.tar.gz > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Extract CHANGELOG section
+        id: changelog
+        shell: bash
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          awk -v ver="${version}" '
+            $0 ~ "^## \\[" ver "\\]" { capture=1; next }
+            capture && /^## \[/ { exit }
+            capture { print }
+          ' CHANGELOG.md > release-body.md
+          if [[ ! -s release-body.md ]]; then
+            echo "Release ${{ steps.version.outputs.tag }}." > release-body.md
+          fi
+          echo "----- release body -----"
+          cat release-body.md
+          echo "------------------------"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          body_path: release-body.md
+          files: |
+            dist/*.tar.gz
+            dist/SHA256SUMS
+          fail_on_unmatched_files: true
+          draft: false
+          prerelease: ${{ startsWith(steps.version.outputs.version, '0.') }}
