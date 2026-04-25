@@ -1,9 +1,9 @@
+mod engine;
+mod frameworks;
+mod report;
+mod rules;
 mod scanner;
 mod scoring;
-mod report;
-mod frameworks;
-mod engine;
-mod rules;
 mod signals;
 
 use clap::{Parser, Subcommand};
@@ -11,7 +11,9 @@ use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(name = "agent-shield")]
-#[command(about = "AI Agent Audit Scanner — discover, score, and report on AI agents in your codebase")]
+#[command(
+    about = "AI Agent Audit Scanner — discover, score, and report on AI agents in your codebase"
+)]
 #[command(version)]
 struct Cli {
     #[command(subcommand)]

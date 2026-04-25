@@ -2,7 +2,7 @@ use crate::engine::{CompiledScoringRule, Engine};
 use crate::frameworks::AgentFramework;
 use crate::rules::types::{Compliance, ParsedSeverity};
 use crate::scanner::DiscoveredAgent;
-use crate::signals::{compute_all_signals, ContextSignals};
+use crate::signals::{ContextSignals, compute_all_signals};
 use serde::Serialize;
 
 #[derive(Debug, Clone, clap::ValueEnum)]
@@ -93,7 +93,10 @@ pub enum Severity {
     Critical,
 }
 
-pub fn score_agents(agents: &[DiscoveredAgent], compliance_framework: &Framework) -> Vec<ScoredAgent> {
+pub fn score_agents(
+    agents: &[DiscoveredAgent],
+    compliance_framework: &Framework,
+) -> Vec<ScoredAgent> {
     let engine = Engine::compile_builtin();
     agents
         .iter()
@@ -267,13 +270,11 @@ fn pick_compliance(c: &Compliance, fw: &Framework) -> String {
         Framework::EuAiAct => &c.eu_ai_act,
         Framework::OwaspAgentic => &c.owasp_agentic,
     };
-    v.first().cloned().unwrap_or_else(|| {
-        match fw {
-            Framework::Nist => "NIST AI RMF".to_string(),
-            Framework::Iso42001 => "ISO/IEC 42001".to_string(),
-            Framework::EuAiAct => "EU AI Act".to_string(),
-            Framework::OwaspAgentic => "OWASP Agentic Top 10".to_string(),
-        }
+    v.first().cloned().unwrap_or_else(|| match fw {
+        Framework::Nist => "NIST AI RMF".to_string(),
+        Framework::Iso42001 => "ISO/IEC 42001".to_string(),
+        Framework::EuAiAct => "EU AI Act".to_string(),
+        Framework::OwaspAgentic => "OWASP Agentic Top 10".to_string(),
     })
 }
 
@@ -363,15 +364,15 @@ mod tests {
         assert_eq!(
             categories,
             vec![
-                "UnboundedAutonomy",       // unbounded-tools
-                "NoHumanOversight",        // unconfirmed-tools
-                "PromptInjectionRisk",     // missing-system-prompt
-                "MissingGuardrail",        // missing-input-validation
-                "MissingGuardrail",        // missing-output-filter
-                "MissingGuardrail",        // missing-rate-limit
-                "ExcessivePermission",     // excessive-admin-permission
-                "DataExposure",            // data-access-broad
-                "MissingAuditTrail",       // missing-audit-trail
+                "UnboundedAutonomy",   // unbounded-tools
+                "NoHumanOversight",    // unconfirmed-tools
+                "PromptInjectionRisk", // missing-system-prompt
+                "MissingGuardrail",    // missing-input-validation
+                "MissingGuardrail",    // missing-output-filter
+                "MissingGuardrail",    // missing-rate-limit
+                "ExcessivePermission", // excessive-admin-permission
+                "DataExposure",        // data-access-broad
+                "MissingAuditTrail",   // missing-audit-trail
             ],
             "scoring rule firing order drifted — \
              check src/engine/mod.rs::EMBEDDED_RULES against W1 baseline"
@@ -470,9 +471,24 @@ mod tests {
                 .iter()
                 .find(|r| r.id == *rule_id)
                 .unwrap_or_else(|| panic!("missing rule {}", rule_id));
-            assert_eq!(pick_compliance(&rule.compliance, &Framework::Nist), *nist, "{} nist", rule_id);
-            assert_eq!(pick_compliance(&rule.compliance, &Framework::Iso42001), *iso, "{} iso", rule_id);
-            assert_eq!(pick_compliance(&rule.compliance, &Framework::EuAiAct), *eu, "{} eu", rule_id);
+            assert_eq!(
+                pick_compliance(&rule.compliance, &Framework::Nist),
+                *nist,
+                "{} nist",
+                rule_id
+            );
+            assert_eq!(
+                pick_compliance(&rule.compliance, &Framework::Iso42001),
+                *iso,
+                "{} iso",
+                rule_id
+            );
+            assert_eq!(
+                pick_compliance(&rule.compliance, &Framework::EuAiAct),
+                *eu,
+                "{} eu",
+                rule_id
+            );
             assert_eq!(
                 pick_compliance(&rule.compliance, &Framework::OwaspAgentic),
                 *owasp,

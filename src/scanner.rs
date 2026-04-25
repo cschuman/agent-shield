@@ -90,6 +90,7 @@ pub fn scan_directory(path: &Path) -> Result<Vec<DiscoveredAgent>, Box<dyn std::
 
     for entry in WalkDir::new(path)
         .follow_links(false)
+        .sort_by_file_name()
         .into_iter()
         .filter_entry(|e| {
             let name = e.file_name().to_string_lossy();
@@ -102,10 +103,7 @@ pub fn scan_directory(path: &Path) -> Result<Vec<DiscoveredAgent>, Box<dyn std::
         }
 
         let file_path = entry.path();
-        let ext = file_path
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("");
+        let ext = file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
 
         if !SCAN_EXTENSIONS.contains(&ext) {
             continue;
@@ -137,12 +135,8 @@ pub fn scan_directory(path: &Path) -> Result<Vec<DiscoveredAgent>, Box<dyn std::
             if hits.len() >= rule.min_match_count as usize {
                 let raw_matches: Vec<(usize, String)> =
                     hits.into_iter().map(|h| (h.line, h.snippet)).collect();
-                let agent = extract_agent_details(
-                    file_path,
-                    &content,
-                    &rule.framework,
-                    &raw_matches,
-                );
+                let agent =
+                    extract_agent_details(file_path, &content, &rule.framework, &raw_matches);
                 agents.push(agent);
             }
         }
@@ -305,14 +299,46 @@ fn detect_guardrails(content: &str) -> Vec<Guardrail> {
     let mut guardrails = Vec::new();
 
     let checks = [
-        ("input.*valid|validate.*input|sanitize", GuardrailKind::InputValidation, "Input validation detected"),
-        ("output.*filter|filter.*output|content.*filter", GuardrailKind::OutputFiltering, "Output filtering detected"),
-        ("rate.*limit|throttle|RateLimiter", GuardrailKind::RateLimit, "Rate limiting detected"),
-        ("human.*approve|human.*loop|require.*approval|confirm.*action", GuardrailKind::HumanApproval, "Human approval gate detected"),
-        ("content.*policy|moderation|safety.*check|guardrail", GuardrailKind::ContentFilter, "Content filtering detected"),
-        ("max.*tokens|token.*limit|max_tokens", GuardrailKind::TokenLimit, "Token limit set"),
-        ("timeout|max.*time|deadline", GuardrailKind::TimeoutLimit, "Timeout limit set"),
-        ("allowed.*tools|tool.*whitelist|scope.*restrict", GuardrailKind::ScopeRestriction, "Scope restriction detected"),
+        (
+            "input.*valid|validate.*input|sanitize",
+            GuardrailKind::InputValidation,
+            "Input validation detected",
+        ),
+        (
+            "output.*filter|filter.*output|content.*filter",
+            GuardrailKind::OutputFiltering,
+            "Output filtering detected",
+        ),
+        (
+            "rate.*limit|throttle|RateLimiter",
+            GuardrailKind::RateLimit,
+            "Rate limiting detected",
+        ),
+        (
+            "human.*approve|human.*loop|require.*approval|confirm.*action",
+            GuardrailKind::HumanApproval,
+            "Human approval gate detected",
+        ),
+        (
+            "content.*policy|moderation|safety.*check|guardrail",
+            GuardrailKind::ContentFilter,
+            "Content filtering detected",
+        ),
+        (
+            "max.*tokens|token.*limit|max_tokens",
+            GuardrailKind::TokenLimit,
+            "Token limit set",
+        ),
+        (
+            "timeout|max.*time|deadline",
+            GuardrailKind::TimeoutLimit,
+            "Timeout limit set",
+        ),
+        (
+            "allowed.*tools|tool.*whitelist|scope.*restrict",
+            GuardrailKind::ScopeRestriction,
+            "Scope restriction detected",
+        ),
     ];
 
     for (pattern, kind, description) in &checks {
@@ -333,22 +359,46 @@ fn detect_data_access(content: &str) -> Vec<DataAccess> {
     let mut access = Vec::new();
 
     let patterns = [
-        (r#"(?i)(?:postgres|mysql|sqlite|mongodb|redis|prisma|kysely|drizzle)\s*[(\.\{]"#, "Database"),
-        (r#"(?i)(?:s3|S3Client|bucket|BlobService|Storage\(\))"#, "Cloud Storage"),
-        (r#"(?i)(?:api_key|API_KEY|bearer|Authorization)\s*[=:]"#, "External API"),
-        (r#"(?i)(?:readFile|read_file|open\(\s*['"]|fs\.read)"#, "File System"),
-        (r#"(?i)(?:sendEmail|smtp|sendgrid|ses\.send)"#, "Email Service"),
-        (r#"(?i)(?:webhook|callback_url)\s*[=:]"#, "Webhook/Notification"),
-        (r#"(?i)(?:subprocess|os\.system|child_process|Command::new)"#, "System Command"),
+        (
+            r#"(?i)(?:postgres|mysql|sqlite|mongodb|redis|prisma|kysely|drizzle)\s*[(\.\{]"#,
+            "Database",
+        ),
+        (
+            r#"(?i)(?:s3|S3Client|bucket|BlobService|Storage\(\))"#,
+            "Cloud Storage",
+        ),
+        (
+            r#"(?i)(?:api_key|API_KEY|bearer|Authorization)\s*[=:]"#,
+            "External API",
+        ),
+        (
+            r#"(?i)(?:readFile|read_file|open\(\s*['"]|fs\.read)"#,
+            "File System",
+        ),
+        (
+            r#"(?i)(?:sendEmail|smtp|sendgrid|ses\.send)"#,
+            "Email Service",
+        ),
+        (
+            r#"(?i)(?:webhook|callback_url)\s*[=:]"#,
+            "Webhook/Notification",
+        ),
+        (
+            r#"(?i)(?:subprocess|os\.system|child_process|Command::new)"#,
+            "System Command",
+        ),
     ];
 
     for (pattern, source) in &patterns {
         if let Ok(re) = Regex::new(pattern)
             && re.is_match(content)
         {
-            let access_type = if content.contains("write") || content.contains("insert")
-                || content.contains("update") || content.contains("delete")
-                || content.contains("put") || content.contains("post")
+            let access_type = if content.contains("write")
+                || content.contains("insert")
+                || content.contains("update")
+                || content.contains("delete")
+                || content.contains("put")
+                || content.contains("post")
             {
                 "read/write"
             } else {
@@ -368,10 +418,26 @@ fn detect_permissions(content: &str) -> Vec<Permission> {
     let mut permissions = Vec::new();
 
     let patterns = [
-        (r"(?i)(?:subprocess|os\.system|child_process|exec\s*\(|shell\s*\(|Command::new)", "system_exec", PermissionLevel::Execute),
-        (r"(?i)(?:\.insert|\.update|\.delete|\.put|\.create)\s*\(", "data_write", PermissionLevel::Write),
-        (r"(?i)(?:admin|superuser|root|sudo|elevated)\s*[=:]", "admin", PermissionLevel::Admin),
-        (r"(?i)(?:\.query|\.select|\.find|\.get)\s*\(", "data_read", PermissionLevel::Read),
+        (
+            r"(?i)(?:subprocess|os\.system|child_process|exec\s*\(|shell\s*\(|Command::new)",
+            "system_exec",
+            PermissionLevel::Execute,
+        ),
+        (
+            r"(?i)(?:\.insert|\.update|\.delete|\.put|\.create)\s*\(",
+            "data_write",
+            PermissionLevel::Write,
+        ),
+        (
+            r"(?i)(?:admin|superuser|root|sudo|elevated)\s*[=:]",
+            "admin",
+            PermissionLevel::Admin,
+        ),
+        (
+            r"(?i)(?:\.query|\.select|\.find|\.get)\s*\(",
+            "data_read",
+            PermissionLevel::Read,
+        ),
     ];
 
     for (pattern, scope, level) in &patterns {
@@ -387,4 +453,3 @@ fn detect_permissions(content: &str) -> Vec<Permission> {
 
     permissions
 }
-

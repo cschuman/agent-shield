@@ -51,11 +51,7 @@ pub struct PermissionFlags {
 /// for a given input, which is what makes this safe to call once and reuse
 /// for both score adjustments and finding generation.
 pub fn compute_all_signals(agent: &DiscoveredAgent) -> ContextSignals {
-    let unconfirmed_tool_count = agent
-        .tools
-        .iter()
-        .filter(|t| !t.has_confirmation)
-        .count();
+    let unconfirmed_tool_count = agent.tools.iter().filter(|t| !t.has_confirmation).count();
 
     let guardrails = GuardrailFlags {
         input_validation: agent

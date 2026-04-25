@@ -1,7 +1,7 @@
-use crate::scoring::{Framework, ScoredAgent, RiskLevel, Severity, FindingCategory};
-use colored::Colorize;
-use comfy_table::{Table, ContentArrangement, Cell, Color as TableColor};
+use crate::scoring::{FindingCategory, Framework, RiskLevel, ScoredAgent, Severity};
 use chrono::Utc;
+use colored::Colorize;
+use comfy_table::{Cell, Color as TableColor, ContentArrangement, Table};
 use std::path::Path;
 
 #[derive(Debug, Clone, clap::ValueEnum)]
@@ -29,14 +29,25 @@ fn render_terminal(agents: &[ScoredAgent], framework: &Framework) {
 
     // Header
     println!();
-    println!("{}", "╔══════════════════════════════════════════════════════════════╗".bold());
-    println!("{}", "║              AGENT SHIELD — Risk Assessment Report          ║".bold());
-    println!("{}", "╚══════════════════════════════════════════════════════════════╝".bold());
+    println!(
+        "{}",
+        "╔══════════════════════════════════════════════════════════════╗".bold()
+    );
+    println!(
+        "{}",
+        "║              AGENT SHIELD — Risk Assessment Report          ║".bold()
+    );
+    println!(
+        "{}",
+        "╚══════════════════════════════════════════════════════════════╝".bold()
+    );
     println!();
     println!("  {}  {}", "Scan date:".dimmed(), now);
     println!("  {}  {}", "Framework:".dimmed(), framework);
     println!("  {}  {}", "Agents found:".dimmed(), agents.len());
-    println!("  {}  {}", "Overall risk:".dimmed(),
+    println!(
+        "  {}  {}",
+        "Overall risk:".dimmed(),
         format!("{}/100 ({})", overall_score, overall_level).color(level_color)
     );
     println!();
@@ -46,12 +57,23 @@ fn render_terminal(agents: &[ScoredAgent], framework: &Framework) {
     println!();
 
     // Agent summary table
-    println!("{}", "─── Agent Inventory ───────────────────────────────────────────".dimmed());
+    println!(
+        "{}",
+        "─── Agent Inventory ───────────────────────────────────────────".dimmed()
+    );
     println!();
 
     let mut table = Table::new();
     table.set_content_arrangement(ContentArrangement::Dynamic);
-    table.set_header(vec!["Agent", "Framework", "Risk", "Tools", "Guardrails", "Permissions", "Autonomy"]);
+    table.set_header(vec![
+        "Agent",
+        "Framework",
+        "Risk",
+        "Tools",
+        "Guardrails",
+        "Permissions",
+        "Autonomy",
+    ]);
 
     for agent in agents {
         let risk_color = match agent.risk_level {
@@ -85,16 +107,17 @@ fn render_terminal(agents: &[ScoredAgent], framework: &Framework) {
     // Findings by severity
     let mut all_findings: Vec<_> = agents
         .iter()
-        .flat_map(|a| {
-            a.findings.iter().map(move |f| (&a.name, f))
-        })
+        .flat_map(|a| a.findings.iter().map(move |f| (&a.name, f)))
         .collect();
 
     // Sort by severity (critical first)
     all_findings.sort_by(|a, b| severity_rank(&b.1.severity).cmp(&severity_rank(&a.1.severity)));
 
     if !all_findings.is_empty() {
-        println!("{}", "─── Findings ─────────────────────────────────────────────────".dimmed());
+        println!(
+            "{}",
+            "─── Findings ─────────────────────────────────────────────────".dimmed()
+        );
         println!();
 
         for (agent_name, finding) in &all_findings {
@@ -116,7 +139,13 @@ fn render_terminal(agents: &[ScoredAgent], framework: &Framework) {
                 FindingCategory::MissingAuditTrail => "📋",
             };
 
-            println!("  {} [{}] {} — {}", category_icon, severity_display, finding.title.bold(), agent_name);
+            println!(
+                "  {} [{}] {} — {}",
+                category_icon,
+                severity_display,
+                finding.title.bold(),
+                agent_name
+            );
             println!("    {}", finding.description.dimmed());
             println!("    {} {}", "Fix:".green(), finding.remediation);
             println!("    {} {}", "Ref:".dimmed(), finding.framework_ref.dimmed());
@@ -125,19 +154,39 @@ fn render_terminal(agents: &[ScoredAgent], framework: &Framework) {
     }
 
     // Summary stats
-    println!("{}", "─── Summary ──────────────────────────────────────────────────".dimmed());
+    println!(
+        "{}",
+        "─── Summary ──────────────────────────────────────────────────".dimmed()
+    );
     println!();
 
-    let critical_count = all_findings.iter().filter(|(_, f)| matches!(f.severity, Severity::Critical)).count();
-    let high_count = all_findings.iter().filter(|(_, f)| matches!(f.severity, Severity::High)).count();
-    let medium_count = all_findings.iter().filter(|(_, f)| matches!(f.severity, Severity::Medium)).count();
-    let low_count = all_findings.iter().filter(|(_, f)| matches!(f.severity, Severity::Low)).count();
+    let critical_count = all_findings
+        .iter()
+        .filter(|(_, f)| matches!(f.severity, Severity::Critical))
+        .count();
+    let high_count = all_findings
+        .iter()
+        .filter(|(_, f)| matches!(f.severity, Severity::High))
+        .count();
+    let medium_count = all_findings
+        .iter()
+        .filter(|(_, f)| matches!(f.severity, Severity::Medium))
+        .count();
+    let low_count = all_findings
+        .iter()
+        .filter(|(_, f)| matches!(f.severity, Severity::Low))
+        .count();
 
-    println!("  {} {}  {} {}  {} {}  {} {}",
-        "CRITICAL:".red().bold(), critical_count,
-        "HIGH:".red(), high_count,
-        "MEDIUM:".yellow(), medium_count,
-        "LOW:".blue(), low_count,
+    println!(
+        "  {} {}  {} {}  {} {}  {} {}",
+        "CRITICAL:".red().bold(),
+        critical_count,
+        "HIGH:".red(),
+        high_count,
+        "MEDIUM:".yellow(),
+        medium_count,
+        "LOW:".blue(),
+        low_count,
     );
     println!();
 
@@ -145,16 +194,38 @@ fn render_terminal(agents: &[ScoredAgent], framework: &Framework) {
     let agents_with_prompts = agents.iter().filter(|a| a.has_system_prompt).count();
     let total_tools: usize = agents.iter().map(|a| a.tool_count).sum();
 
-    println!("  {}  {} across {} agents", "Total tools:".dimmed(), total_tools, agents.len());
+    println!(
+        "  {}  {} across {} agents",
+        "Total tools:".dimmed(),
+        total_tools,
+        agents.len()
+    );
     println!("  {}  {}", "Total guardrails:".dimmed(), total_guardrails);
-    println!("  {}  {}/{}", "System prompts:".dimmed(), agents_with_prompts, agents.len());
+    println!(
+        "  {}  {}/{}",
+        "System prompts:".dimmed(),
+        agents_with_prompts,
+        agents.len()
+    );
     println!();
 
     // Footer
-    println!("{}", "──────────────────────────────────────────────────────────────".dimmed());
-    println!("  {} https://agentshield.dev", "Full report & remediation guide:".dimmed());
-    println!("  {} agent-shield scan --format json -o report.json", "Export JSON:".dimmed());
-    println!("{}", "──────────────────────────────────────────────────────────────".dimmed());
+    println!(
+        "{}",
+        "──────────────────────────────────────────────────────────────".dimmed()
+    );
+    println!(
+        "  {} https://agentshield.dev",
+        "Full report & remediation guide:".dimmed()
+    );
+    println!(
+        "  {} agent-shield scan --format json -o report.json",
+        "Export JSON:".dimmed()
+    );
+    println!(
+        "{}",
+        "──────────────────────────────────────────────────────────────".dimmed()
+    );
     println!();
 }
 

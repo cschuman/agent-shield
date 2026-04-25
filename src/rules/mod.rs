@@ -36,7 +36,10 @@ mod builtin_yaml_tests {
                     .unwrap_or_else(|e| panic!("rules/builtin/{} failed to parse: {}", $path, e));
                 assert_eq!(rule.schema_version, "1.0");
                 assert_eq!(rule.category, "detection");
-                assert!(rule.framework.is_some(), "detection rule must declare framework");
+                assert!(
+                    rule.framework.is_some(),
+                    "detection rule must declare framework"
+                );
                 assert!(rule.extends.is_none(), "extends must be null in v1.0");
                 assert_eq!(
                     rule.when.populated_slot_count(),
@@ -73,8 +76,14 @@ mod scoring_yaml_tests {
                 let rule: ParsedRule = serde_yaml::from_str(yaml)
                     .unwrap_or_else(|e| panic!("rules/scoring/{} failed to parse: {}", $path, e));
                 assert_eq!(rule.schema_version, "1.0");
-                assert!(rule.category != "detection", "scoring rules cannot be category=detection");
-                assert!(rule.score_adjustment.is_some(), "scoring rules must declare score_adjustment");
+                assert!(
+                    rule.category != "detection",
+                    "scoring rules cannot be category=detection"
+                );
+                assert!(
+                    rule.score_adjustment.is_some(),
+                    "scoring rules must declare score_adjustment"
+                );
                 assert!(rule.extends.is_none(), "extends must be null in v1.0");
                 if $expect_finding {
                     assert!(rule.title.is_some(), "expected title");
@@ -93,11 +102,23 @@ mod scoring_yaml_tests {
     roundtrip_scoring!(rt_empty_tools, "empty-tools.yaml", false);
     roundtrip_scoring!(rt_unbounded_tools, "unbounded-tools.yaml", true);
     roundtrip_scoring!(rt_missing_system_prompt, "missing-system-prompt.yaml", true);
-    roundtrip_scoring!(rt_missing_input_validation, "missing-input-validation.yaml", true);
+    roundtrip_scoring!(
+        rt_missing_input_validation,
+        "missing-input-validation.yaml",
+        true
+    );
     roundtrip_scoring!(rt_missing_output_filter, "missing-output-filter.yaml", true);
     roundtrip_scoring!(rt_missing_rate_limit, "missing-rate-limit.yaml", true);
-    roundtrip_scoring!(rt_excessive_exec_permission, "excessive-exec-permission.yaml", true);
-    roundtrip_scoring!(rt_excessive_admin_permission, "excessive-admin-permission.yaml", true);
+    roundtrip_scoring!(
+        rt_excessive_exec_permission,
+        "excessive-exec-permission.yaml",
+        true
+    );
+    roundtrip_scoring!(
+        rt_excessive_admin_permission,
+        "excessive-admin-permission.yaml",
+        true
+    );
     roundtrip_scoring!(rt_data_access_broad, "data-access-broad.yaml", true);
     roundtrip_scoring!(rt_missing_audit_trail, "missing-audit-trail.yaml", true);
 

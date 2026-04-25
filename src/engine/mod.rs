@@ -86,7 +86,6 @@ pub struct CompiledRuleSet {
     pub scoring_rules: Vec<CompiledScoringRule>,
 }
 
-
 /// Detection engine.
 ///
 /// A thin wrapper over a `CompiledRuleSet`. Construction methods —
@@ -201,8 +200,14 @@ impl Engine {
 /// run `bash scripts/snapshot.sh verify` before committing.
 pub const EMBEDDED_RULES: &[(&str, &str)] = &[
     // ===== Detection rules (Tier-1) =====
-    ("langchain", include_str!("../../rules/builtin/langchain.yaml")),
-    ("langgraph", include_str!("../../rules/builtin/langgraph.yaml")),
+    (
+        "langchain",
+        include_str!("../../rules/builtin/langchain.yaml"),
+    ),
+    (
+        "langgraph",
+        include_str!("../../rules/builtin/langgraph.yaml"),
+    ),
     ("crewai", include_str!("../../rules/builtin/crewai.yaml")),
     ("autogen", include_str!("../../rules/builtin/autogen.yaml")),
     (
@@ -221,7 +226,10 @@ pub const EMBEDDED_RULES: &[(&str, &str)] = &[
         "aws-bedrock",
         include_str!("../../rules/builtin/aws-bedrock.yaml"),
     ),
-    ("vercel-ai", include_str!("../../rules/builtin/vercel-ai.yaml")),
+    (
+        "vercel-ai",
+        include_str!("../../rules/builtin/vercel-ai.yaml"),
+    ),
     (
         "custom-agent",
         include_str!("../../rules/builtin/custom-agent.yaml"),
@@ -306,8 +314,16 @@ pub fn describe_matcher(m: &Matcher) -> Vec<String> {
             .into_iter()
             .map(|s| format!("not({})", s))
             .collect(),
-        Matcher::ContextSignal { name, param, op, value } => {
-            let p = param.as_deref().map(|p| format!("[{}]", p)).unwrap_or_default();
+        Matcher::ContextSignal {
+            name,
+            param,
+            op,
+            value,
+        } => {
+            let p = param
+                .as_deref()
+                .map(|p| format!("[{}]", p))
+                .unwrap_or_default();
             vec![format!("signal: {}{} {:?} {:?}", name, p, op, value)]
         }
     }
@@ -381,5 +397,4 @@ mod tests {
             "11 scoring rules — one per legacy inline finding plus the empty-tools silent bump"
         );
     }
-
 }

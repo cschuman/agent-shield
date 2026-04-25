@@ -112,7 +112,10 @@ fn parse_one(source: &str, content: &str) -> Result<ParsedOne, RuleDiagnostic> {
         return Err(RuleDiagnostic::new(
             source,
             Some(&parsed.id),
-            format!("`extends` is reserved for v1.1 — must be null in v1.0{}", extra),
+            format!(
+                "`extends` is reserved for v1.1 — must be null in v1.0{}",
+                extra
+            ),
         ));
     }
 
@@ -281,9 +284,7 @@ fn translate_scoring(
 fn is_signal_only(m: &Matcher) -> bool {
     match m {
         Matcher::ContextSignal { .. } => true,
-        Matcher::AllOf(children) | Matcher::AnyOf(children) => {
-            children.iter().all(is_signal_only)
-        }
+        Matcher::AllOf(children) | Matcher::AnyOf(children) => children.iter().all(is_signal_only),
         Matcher::Not(inner) => is_signal_only(inner),
         Matcher::ImportContains { .. }
         | Matcher::CodeRegex { .. }
@@ -309,7 +310,11 @@ fn translate_detection(source: &str, parsed: ParsedRule) -> Result<CompiledRule,
     }
 
     let framework_name = parsed.framework.as_deref().ok_or_else(|| {
-        RuleDiagnostic::new(source, Some(&id), "detection rules must declare `framework`")
+        RuleDiagnostic::new(
+            source,
+            Some(&id),
+            "detection rules must declare `framework`",
+        )
     })?;
     let framework = resolve_framework(framework_name).ok_or_else(|| {
         RuleDiagnostic::new(
@@ -371,7 +376,10 @@ fn translate_matcher(
         return Err(RuleDiagnostic::new(
             source,
             Some(rule_id),
-            format!("matcher node has {} populated slots; exactly one is required", n),
+            format!(
+                "matcher node has {} populated slots; exactly one is required",
+                n
+            ),
         ));
     }
 
@@ -417,10 +425,14 @@ fn translate_matcher(
         return translate_context_signal(source, rule_id, sig);
     }
     if let Some(children) = &pm.all_of {
-        return Ok(Matcher::AllOf(translate_children(source, rule_id, children)?));
+        return Ok(Matcher::AllOf(translate_children(
+            source, rule_id, children,
+        )?));
     }
     if let Some(children) = &pm.any_of {
-        return Ok(Matcher::AnyOf(translate_children(source, rule_id, children)?));
+        return Ok(Matcher::AnyOf(translate_children(
+            source, rule_id, children,
+        )?));
     }
     if let Some(inner) = &pm.not {
         return Ok(Matcher::Not(Box::new(translate_matcher(
@@ -491,8 +503,10 @@ fn translate_context_signal(
     };
     // Reject ordering ops on boolean signals — the matcher silently returns
     // false for that combination, but the loader catches it as a likely typo.
-    if matches!(op, SignalOp::Gt | SignalOp::Gte | SignalOp::Lt | SignalOp::Lte)
-        && matches!(value, SignalValue::Bool(_))
+    if matches!(
+        op,
+        SignalOp::Gt | SignalOp::Gte | SignalOp::Lt | SignalOp::Lte
+    ) && matches!(value, SignalValue::Bool(_))
     {
         return Err(RuleDiagnostic::new(
             source,
@@ -998,8 +1012,16 @@ when:
             ("unconfirmed_tool_count", None, SignalValue::Int(7)),
             ("has_system_prompt", None, SignalValue::Bool(true)),
             ("has_audit_trail", None, SignalValue::Bool(true)),
-            ("has_guardrail", Some("input_validation"), SignalValue::Bool(true)),
-            ("has_guardrail", Some("output_filtering"), SignalValue::Bool(true)),
+            (
+                "has_guardrail",
+                Some("input_validation"),
+                SignalValue::Bool(true),
+            ),
+            (
+                "has_guardrail",
+                Some("output_filtering"),
+                SignalValue::Bool(true),
+            ),
             ("has_guardrail", Some("rate_limit"), SignalValue::Bool(true)),
             ("has_permission", Some("execute"), SignalValue::Bool(true)),
             ("has_permission", Some("admin"), SignalValue::Bool(true)),
@@ -1090,13 +1112,10 @@ when:
     mod bad_rule_fixtures {
         use super::*;
 
-        const MALFORMED_YAML: &str =
-            include_str!("../../tests/bad-rules/malformed-yaml.yaml");
+        const MALFORMED_YAML: &str = include_str!("../../tests/bad-rules/malformed-yaml.yaml");
         const BAD_REGEX: &str = include_str!("../../tests/bad-rules/bad-regex.yaml");
-        const NON_NULL_EXTENDS: &str =
-            include_str!("../../tests/bad-rules/non-null-extends.yaml");
-        const UNKNOWN_SIGNAL: &str =
-            include_str!("../../tests/bad-rules/unknown-signal.yaml");
+        const NON_NULL_EXTENDS: &str = include_str!("../../tests/bad-rules/non-null-extends.yaml");
+        const UNKNOWN_SIGNAL: &str = include_str!("../../tests/bad-rules/unknown-signal.yaml");
         const FUTURE_SCHEMA_VERSION: &str =
             include_str!("../../tests/bad-rules/future-schema-version.yaml");
 
@@ -1111,7 +1130,12 @@ when:
                 "{}: detection must stay empty",
                 label
             );
-            assert_eq!(parsed.scoring.len(), 0, "{}: scoring must stay empty", label);
+            assert_eq!(
+                parsed.scoring.len(),
+                0,
+                "{}: scoring must stay empty",
+                label
+            );
             assert_eq!(
                 parsed.diagnostics.len(),
                 1,

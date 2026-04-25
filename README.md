@@ -62,7 +62,7 @@ Windows binaries are not yet shipped. If you need one, please
 cargo install --git https://github.com/cschuman/agent-shield agent-shield
 ```
 
-Requires Rust 1.85 or newer (edition 2024).
+Requires Rust 1.88 or newer (edition 2024 + let-chains).
 
 ## Usage
 

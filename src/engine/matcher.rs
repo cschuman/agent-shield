@@ -133,22 +133,13 @@ pub enum Matcher {
     /// Substring match on a line that also contains an import-like keyword
     /// (`import`, `require`, `use `). Mirrors the current `Import` detection
     /// behavior in `scanner.rs::check_framework_patterns`.
-    ImportContains {
-        needle: String,
-        languages: LangSet,
-    },
+    ImportContains { needle: String, languages: LangSet },
     /// Regex match against each line of the file.
-    CodeRegex {
-        pattern: Regex,
-        languages: LangSet,
-    },
+    CodeRegex { pattern: Regex, languages: LangSet },
     /// Regex match against the entire file content (cross-line). Reserved
     /// for v1.0 schema completeness; no `frameworks.rs` pattern translates
     /// to this variant in C3.
-    MultilineRegex {
-        pattern: Regex,
-        languages: LangSet,
-    },
+    MultilineRegex { pattern: Regex, languages: LangSet },
     /// Substring match against the concatenated manifest text at the repo
     /// root. Mirrors `detect_frameworks_from_manifests`.
     PackageDep { name: String },
@@ -240,10 +231,7 @@ impl Matcher {
                     Vec::new()
                 }
             }
-            Matcher::AnyOf(children) => children
-                .iter()
-                .flat_map(|c| c.matches_file(ctx))
-                .collect(),
+            Matcher::AnyOf(children) => children.iter().flat_map(|c| c.matches_file(ctx)).collect(),
             Matcher::Not(inner) => {
                 if inner.matches_file(ctx).is_empty() {
                     vec![MatchHit {
@@ -299,10 +287,7 @@ impl Matcher {
                     Vec::new()
                 }
             }
-            Matcher::AnyOf(children) => children
-                .iter()
-                .flat_map(|c| c.matches_repo(ctx))
-                .collect(),
+            Matcher::AnyOf(children) => children.iter().flat_map(|c| c.matches_repo(ctx)).collect(),
             Matcher::Not(inner) => {
                 if inner.matches_repo(ctx).is_empty() {
                     vec![MatchHit {
@@ -335,8 +320,10 @@ impl Matcher {
             | Matcher::PackageDep { .. }
             | Matcher::FilePresent { .. } => Vec::new(),
             Matcher::AllOf(children) => {
-                let per_child: Vec<Vec<MatchHit>> =
-                    children.iter().map(|c| c.matches_signals(signals)).collect();
+                let per_child: Vec<Vec<MatchHit>> = children
+                    .iter()
+                    .map(|c| c.matches_signals(signals))
+                    .collect();
                 if per_child.iter().all(|hits| !hits.is_empty()) {
                     per_child.into_iter().flatten().collect()
                 } else {
@@ -381,8 +368,12 @@ fn evaluate_context_signal(
         "has_system_prompt" => compare_bool(signals.has_system_prompt, op, value),
         "has_audit_trail" => compare_bool(signals.has_audit_trail, op, value),
         "has_guardrail" => match param {
-            Some("input_validation") => compare_bool(signals.guardrails.input_validation, op, value),
-            Some("output_filtering") => compare_bool(signals.guardrails.output_filtering, op, value),
+            Some("input_validation") => {
+                compare_bool(signals.guardrails.input_validation, op, value)
+            }
+            Some("output_filtering") => {
+                compare_bool(signals.guardrails.output_filtering, op, value)
+            }
             Some("rate_limit") => compare_bool(signals.guardrails.rate_limit, op, value),
             _ => false,
         },
@@ -470,25 +461,35 @@ mod tests {
     fn integer_signal_eq_ne_ordering() {
         let signals = signals_with_tools(11);
         // 11 != 10
-        assert!(cs("tool_count", SignalOp::Eq, SignalValue::Int(10))
-            .matches_signals(&signals)
-            .is_empty());
+        assert!(
+            cs("tool_count", SignalOp::Eq, SignalValue::Int(10))
+                .matches_signals(&signals)
+                .is_empty()
+        );
         // 11 > 10
-        assert!(!cs("tool_count", SignalOp::Gt, SignalValue::Int(10))
-            .matches_signals(&signals)
-            .is_empty());
+        assert!(
+            !cs("tool_count", SignalOp::Gt, SignalValue::Int(10))
+                .matches_signals(&signals)
+                .is_empty()
+        );
         // 11 >= 11
-        assert!(!cs("tool_count", SignalOp::Gte, SignalValue::Int(11))
-            .matches_signals(&signals)
-            .is_empty());
+        assert!(
+            !cs("tool_count", SignalOp::Gte, SignalValue::Int(11))
+                .matches_signals(&signals)
+                .is_empty()
+        );
         // 11 not < 11
-        assert!(cs("tool_count", SignalOp::Lt, SignalValue::Int(11))
-            .matches_signals(&signals)
-            .is_empty());
+        assert!(
+            cs("tool_count", SignalOp::Lt, SignalValue::Int(11))
+                .matches_signals(&signals)
+                .is_empty()
+        );
         // 11 != 10
-        assert!(!cs("tool_count", SignalOp::Ne, SignalValue::Int(10))
-            .matches_signals(&signals)
-            .is_empty());
+        assert!(
+            !cs("tool_count", SignalOp::Ne, SignalValue::Int(10))
+                .matches_signals(&signals)
+                .is_empty()
+        );
     }
 
     #[test]
@@ -497,12 +498,16 @@ mod tests {
             has_system_prompt: false,
             ..Default::default()
         };
-        assert!(!cs("has_system_prompt", SignalOp::Eq, SignalValue::Bool(false))
-            .matches_signals(&signals)
-            .is_empty());
-        assert!(cs("has_system_prompt", SignalOp::Eq, SignalValue::Bool(true))
-            .matches_signals(&signals)
-            .is_empty());
+        assert!(
+            !cs("has_system_prompt", SignalOp::Eq, SignalValue::Bool(false))
+                .matches_signals(&signals)
+                .is_empty()
+        );
+        assert!(
+            cs("has_system_prompt", SignalOp::Eq, SignalValue::Bool(true))
+                .matches_signals(&signals)
+                .is_empty()
+        );
     }
 
     #[test]
@@ -512,9 +517,11 @@ mod tests {
             ..Default::default()
         };
         // Ordering on bool returns empty (defensive — loader rejects this).
-        assert!(cs("has_system_prompt", SignalOp::Gt, SignalValue::Bool(false))
-            .matches_signals(&signals)
-            .is_empty());
+        assert!(
+            cs("has_system_prompt", SignalOp::Gt, SignalValue::Bool(false))
+                .matches_signals(&signals)
+                .is_empty()
+        );
     }
 
     #[test]
@@ -527,22 +534,26 @@ mod tests {
             },
             ..Default::default()
         };
-        assert!(!cs_param(
-            "has_guardrail",
-            "input_validation",
-            SignalOp::Eq,
-            SignalValue::Bool(true)
-        )
-        .matches_signals(&signals)
-        .is_empty());
-        assert!(!cs_param(
-            "has_guardrail",
-            "output_filtering",
-            SignalOp::Eq,
-            SignalValue::Bool(false)
-        )
-        .matches_signals(&signals)
-        .is_empty());
+        assert!(
+            !cs_param(
+                "has_guardrail",
+                "input_validation",
+                SignalOp::Eq,
+                SignalValue::Bool(true)
+            )
+            .matches_signals(&signals)
+            .is_empty()
+        );
+        assert!(
+            !cs_param(
+                "has_guardrail",
+                "output_filtering",
+                SignalOp::Eq,
+                SignalValue::Bool(false)
+            )
+            .matches_signals(&signals)
+            .is_empty()
+        );
     }
 
     #[test]
@@ -555,30 +566,36 @@ mod tests {
             },
             ..Default::default()
         };
-        assert!(!cs_param(
-            "has_permission",
-            "execute",
-            SignalOp::Eq,
-            SignalValue::Bool(true)
-        )
-        .matches_signals(&signals)
-        .is_empty());
-        assert!(cs_param(
-            "has_permission",
-            "admin",
-            SignalOp::Eq,
-            SignalValue::Bool(true)
-        )
-        .matches_signals(&signals)
-        .is_empty());
+        assert!(
+            !cs_param(
+                "has_permission",
+                "execute",
+                SignalOp::Eq,
+                SignalValue::Bool(true)
+            )
+            .matches_signals(&signals)
+            .is_empty()
+        );
+        assert!(
+            cs_param(
+                "has_permission",
+                "admin",
+                SignalOp::Eq,
+                SignalValue::Bool(true)
+            )
+            .matches_signals(&signals)
+            .is_empty()
+        );
     }
 
     #[test]
     fn unknown_signal_name_is_empty_defensively() {
         let signals = ContextSignals::default();
-        assert!(cs("not_a_real_signal", SignalOp::Eq, SignalValue::Bool(true))
-            .matches_signals(&signals)
-            .is_empty());
+        assert!(
+            cs("not_a_real_signal", SignalOp::Eq, SignalValue::Bool(true))
+                .matches_signals(&signals)
+                .is_empty()
+        );
     }
 
     #[test]
@@ -591,9 +608,11 @@ mod tests {
             ..Default::default()
         };
         // No param provided — defensive empty (loader rejects this shape).
-        assert!(cs("has_guardrail", SignalOp::Eq, SignalValue::Bool(true))
-            .matches_signals(&signals)
-            .is_empty());
+        assert!(
+            cs("has_guardrail", SignalOp::Eq, SignalValue::Bool(true))
+                .matches_signals(&signals)
+                .is_empty()
+        );
     }
 
     #[test]

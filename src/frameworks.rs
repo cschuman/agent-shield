@@ -1,6 +1,6 @@
 use crate::engine::{Engine, describe_matcher};
 use colored::Colorize;
-use comfy_table::{Table, ContentArrangement};
+use comfy_table::{ContentArrangement, Table};
 
 /// Supported agent framework families.
 ///
@@ -42,14 +42,14 @@ impl AgentFramework {
     pub fn risk_baseline(&self) -> u8 {
         match self {
             Self::LangChain | Self::LangGraph => 40,
-            Self::CrewAI => 50,       // multi-agent = higher baseline
-            Self::AutoGen => 50,      // multi-agent
+            Self::CrewAI => 50,  // multi-agent = higher baseline
+            Self::AutoGen => 50, // multi-agent
             Self::OpenAIAssistants => 35,
             Self::AnthropicMCP => 30, // tool-use focused
             Self::AnthropicAgentSDK => 45,
             Self::AWSBedrock => 35,
-            Self::VercelAI => 25,     // typically simpler
-            Self::CustomAgent => 55,  // unknown = higher risk
+            Self::VercelAI => 25,    // typically simpler
+            Self::CustomAgent => 55, // unknown = higher risk
         }
     }
 
@@ -101,7 +101,11 @@ pub fn list_frameworks() {
             .take(2)
             .collect();
 
-        table.add_row(vec![fw.name().to_string(), risk_display, methods.join(", ")]);
+        table.add_row(vec![
+            fw.name().to_string(),
+            risk_display,
+            methods.join(", "),
+        ]);
     }
 
     println!("{table}");
