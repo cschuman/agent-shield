@@ -77,6 +77,18 @@ const SKIP_DIRS: &[&str] = &[
     ".next",
     ".svelte-kit",
     "vendor",
+    // Test trees: real-world calibration on langgraph showed ~37% of all
+    // detections came from `tests/` (143 of 385). Test code routinely sets
+    // up agent-shaped fixtures that aren't deployed agents — they're
+    // exercising the framework's own surface, not running in production.
+    // A repo's tests are inside its own trust boundary and don't add to
+    // an auditor's blast radius.
+    "tests",
+    "test",
+    "__tests__",
+    "__testfixtures__",
+    "__mocks__",
+    "spec",
 ];
 
 const SCAN_EXTENSIONS: &[&str] = &[
