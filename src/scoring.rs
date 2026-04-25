@@ -123,12 +123,15 @@ fn score_single_agent(
     // set, in source order. EMBEDDED_RULES enforces firing order to keep
     // snapshot output byte-identical. score_adjustment is bounded to
     // ±100 by the loader, so saturating_add cannot overflow even with
-    // an adversarial 11-rule pile-on.
+    // an adversarial 11-rule pile-on. The i16::try_from is defense in depth:
+    // if a future loader change widens the bound past i16::MAX, the rule
+    // contributes 0 instead of wrapping.
     for rule in engine.scoring_rules() {
         if rule.matcher.matches_signals(&signals).is_empty() {
             continue;
         }
-        score = score.saturating_add(rule.score_adjustment as i16);
+        let adjustment = i16::try_from(rule.score_adjustment).unwrap_or(0);
+        score = score.saturating_add(adjustment);
         if let Some(finding) = materialize_finding(rule, compliance_framework, &signals) {
             findings.push(finding);
         }
@@ -316,7 +319,8 @@ mod tests {
         //   - first 3 lack confirmation → unconfirmed-tools fires
         //   - autonomy_tier saturates at 5 with admin permission
         //   - no system prompt, no guardrails → 4 missing-* rules fire
-        //   - admin permission → exec + admin both fire
+        //   - admin permission → only excessive-admin-permission fires
+        //     (excessive-exec-permission requires level=execute specifically)
         //   - 4 data sources → data-access-broad fires
         //   - no audit trail → missing-audit-trail fires
         let mut agent = naked_agent();

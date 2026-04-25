@@ -47,9 +47,11 @@ The loader (`src/rules/loader.rs`) deserializes via `serde_yaml`, validates (sch
 
 `AgentFramework` (`src/frameworks.rs`) keeps its enum identity — `name()`, `risk_baseline()`, `all()` — but no longer carries detection logic. Adding a new framework requires:
 
-1. New variant in `AgentFramework`.
-2. New `rules/builtin/<framework>.yaml`.
-3. Insert the entry into `EMBEDDED_RULES` in matching position.
+1. New variant in `AgentFramework` + update `name()`, `risk_baseline()`, `all()` in `src/frameworks.rs`.
+2. Update `variant_ident()` in `src/rules/loader.rs` so YAML `framework:` strings parse to the new variant.
+3. New `rules/builtin/<slug>.yaml` mirroring the existing detection-rule schema.
+4. Insert the entry into `EMBEDDED_RULES` (`src/engine/mod.rs`) in matching position relative to `AgentFramework::all()`.
+5. `bash scripts/snapshot.sh verify` (existing fixtures must still match; new framework needs a new fixture if you want regression coverage).
 
 Adding a new scoring rule requires:
 

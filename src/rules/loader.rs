@@ -28,7 +28,7 @@ use crate::engine::matcher::{LangSet, Matcher, SignalOp, SignalValue};
 use crate::engine::{CompiledRule, CompiledScoringRule};
 use crate::frameworks::AgentFramework;
 use crate::rules::types::{
-    Compliance, ParsedContextSignal, ParsedMatcher, ParsedRule, ParsedSignalOp, ParsedSignalValue,
+    ParsedContextSignal, ParsedMatcher, ParsedRule, ParsedSignalOp, ParsedSignalValue,
 };
 use regex::Regex;
 
@@ -212,18 +212,23 @@ fn translate_scoring(
                 "rule has `title` but no `remediation` — finding would be incomplete",
             ));
         }
-        let compliance = parsed.compliance.as_ref().ok_or_else(|| {
-            RuleDiagnostic::new(
+        if parsed.compliance.is_none() {
+            return Err(RuleDiagnostic::new(
                 source,
                 Some(&id),
                 "rule has `title` but no `compliance` block — cannot map to user --framework",
-            )
-        })?;
-        // pick_compliance() in scoring.rs reads .first() from each list. Lists
-        // with multiple elements would silently drop entries beyond the first;
-        // empty lists fall through to a generic framework label that drifts
-        // from the byte-identical W1 strings. Pin every framework to exactly
-        // one entry today and revisit the multi-element shape in v1.1.
+            ));
+        }
+    }
+
+    // Whenever a compliance block is present (even on silent rules), enforce
+    // exactly-one entry per framework. pick_compliance() in scoring.rs reads
+    // .first() from each list; lists with multiple elements would silently
+    // drop entries beyond the first, and empty lists fall through to a
+    // generic framework label that drifts from the byte-identical W1 strings.
+    // Validating unconditionally prevents silent rules from sneaking malformed
+    // compliance metadata past the loader (M1 fix).
+    if let Some(compliance) = parsed.compliance.as_ref() {
         let frameworks: [(&str, &Vec<String>); 4] = [
             ("nist_ai_rmf", &compliance.nist_ai_rmf),
             ("iso_42001", &compliance.iso_42001),
@@ -264,7 +269,7 @@ fn translate_scoring(
         remediation: parsed.remediation,
         matcher,
         score_adjustment,
-        compliance: parsed.compliance.unwrap_or_else(Compliance::default),
+        compliance: parsed.compliance.unwrap_or_default(),
         extends: None,
     })
 }
@@ -510,21 +515,21 @@ fn translate_context_signal(
 /// evaluate. Mirror of `evaluate_context_signal` in matcher.rs — keep them
 /// in lockstep.
 fn is_known_signal(name: &str, param: Option<&str>) -> bool {
-    match (name, param) {
+    matches!(
+        (name, param),
         ("tool_count", None)
-        | ("autonomy_tier", None)
-        | ("data_source_count", None)
-        | ("unconfirmed_tool_count", None)
-        | ("has_system_prompt", None)
-        | ("has_audit_trail", None) => true,
-        ("has_guardrail", Some("input_validation"))
-        | ("has_guardrail", Some("output_filtering"))
-        | ("has_guardrail", Some("rate_limit")) => true,
-        ("has_permission", Some("execute"))
-        | ("has_permission", Some("admin"))
-        | ("has_permission", Some("write")) => true,
-        _ => false,
-    }
+            | ("autonomy_tier", None)
+            | ("data_source_count", None)
+            | ("unconfirmed_tool_count", None)
+            | ("has_system_prompt", None)
+            | ("has_audit_trail", None)
+            | ("has_guardrail", Some("input_validation"))
+            | ("has_guardrail", Some("output_filtering"))
+            | ("has_guardrail", Some("rate_limit"))
+            | ("has_permission", Some("execute"))
+            | ("has_permission", Some("admin"))
+            | ("has_permission", Some("write"))
+    )
 }
 
 fn allowlist_help() -> &'static str {
@@ -970,6 +975,112 @@ when:
 "#;
         let err = one(yaml).expect_err("must reject");
         assert!(err.message.contains("meaningless"));
+    }
+
+    /// Architect-blocker parity test: `is_known_signal` (loader.rs) and
+    /// `evaluate_context_signal` (matcher.rs) must agree on the v1 signal
+    /// allowlist. Drift here is silent — a loader-accepted signal that the
+    /// matcher doesn't handle would produce empty results forever; a
+    /// matcher-handled signal that the loader rejects would never get a
+    /// chance to fire. The canonical pairs live here as the contract.
+    #[test]
+    fn signal_allowlist_loader_matcher_parity() {
+        use crate::engine::matcher::{Matcher, SignalOp, SignalValue};
+        use crate::signals::{ContextSignals, GuardrailFlags, PermissionFlags};
+
+        // Canonical pairs. Adding a new (name, param) to the v1 allowlist
+        // requires touching this list, is_known_signal, and
+        // evaluate_context_signal — three changes, by design.
+        let canonical: &[(&str, Option<&str>, SignalValue)] = &[
+            ("tool_count", None, SignalValue::Int(7)),
+            ("autonomy_tier", None, SignalValue::Int(7)),
+            ("data_source_count", None, SignalValue::Int(7)),
+            ("unconfirmed_tool_count", None, SignalValue::Int(7)),
+            ("has_system_prompt", None, SignalValue::Bool(true)),
+            ("has_audit_trail", None, SignalValue::Bool(true)),
+            ("has_guardrail", Some("input_validation"), SignalValue::Bool(true)),
+            ("has_guardrail", Some("output_filtering"), SignalValue::Bool(true)),
+            ("has_guardrail", Some("rate_limit"), SignalValue::Bool(true)),
+            ("has_permission", Some("execute"), SignalValue::Bool(true)),
+            ("has_permission", Some("admin"), SignalValue::Bool(true)),
+            ("has_permission", Some("write"), SignalValue::Bool(true)),
+        ];
+
+        // Sentinel signals: every int field = 7, every bool field = true.
+        // For each canonical pair, an `eq` against the sentinel value should
+        // produce a hit iff evaluate_context_signal recognises the pair.
+        let signals = ContextSignals {
+            autonomy_tier: 7,
+            tool_count: 7,
+            unconfirmed_tool_count: 7,
+            has_system_prompt: true,
+            has_audit_trail: true,
+            data_source_count: 7,
+            guardrails: GuardrailFlags {
+                input_validation: true,
+                output_filtering: true,
+                rate_limit: true,
+            },
+            permissions: PermissionFlags {
+                execute: true,
+                admin: true,
+                write: true,
+            },
+        };
+
+        for (name, param, sentinel) in canonical {
+            assert!(
+                is_known_signal(name, *param),
+                "loader rejects canonical pair: {} {:?}",
+                name,
+                param
+            );
+
+            let matcher = Matcher::ContextSignal {
+                name: (*name).to_string(),
+                param: param.map(|s| s.to_string()),
+                op: SignalOp::Eq,
+                value: sentinel.clone(),
+            };
+            let hits = matcher.matches_signals(&signals);
+            assert!(
+                !hits.is_empty(),
+                "matcher does not evaluate canonical pair: {} {:?}",
+                name,
+                param
+            );
+        }
+
+        // Non-canonical pairs must be rejected by both ends.
+        let bogus: &[(&str, Option<&str>)] = &[
+            ("bogus_signal", None),
+            ("has_guardrail", Some("bogus_param")),
+            ("has_guardrail", None),
+            ("has_permission", Some("bogus_param")),
+            ("has_permission", None),
+            ("tool_count", Some("unexpected_param")),
+        ];
+        for (name, param) in bogus {
+            assert!(
+                !is_known_signal(name, *param),
+                "loader accepts non-canonical pair: {} {:?}",
+                name,
+                param
+            );
+            let matcher = Matcher::ContextSignal {
+                name: (*name).to_string(),
+                param: param.map(|s| s.to_string()),
+                op: SignalOp::Eq,
+                value: SignalValue::Bool(true),
+            };
+            let hits = matcher.matches_signals(&signals);
+            assert!(
+                hits.is_empty(),
+                "matcher evaluates non-canonical pair: {} {:?}",
+                name,
+                param
+            );
+        }
     }
 
     /// Bad-rule fixtures (W2-C9). Each file under `tests/bad-rules/`

@@ -220,21 +220,20 @@ fn extract_agent_name(content: &str, _framework: &AgentFramework) -> Option<Stri
     ];
 
     for pat in &name_patterns {
-        if let Ok(re) = Regex::new(pat) {
-            if let Some(caps) = re.captures(content) {
-                if let Some(name) = caps.get(1) {
-                    let n = name.as_str();
-                    // Filter out false positive names
-                    if n.len() > 2
-                        && n.len() < 60
-                        && !n.contains("Error")
-                        && !n.contains("Exception")
-                        && !n.contains("Test")
-                        && !n.contains("Mock")
-                    {
-                        return Some(n.to_string());
-                    }
-                }
+        if let Ok(re) = Regex::new(pat)
+            && let Some(caps) = re.captures(content)
+            && let Some(name) = caps.get(1)
+        {
+            let n = name.as_str();
+            // Filter out false positive names
+            if n.len() > 2
+                && n.len() < 60
+                && !n.contains("Error")
+                && !n.contains("Exception")
+                && !n.contains("Test")
+                && !n.contains("Mock")
+            {
+                return Some(n.to_string());
             }
         }
     }
@@ -286,17 +285,16 @@ fn extract_system_prompt(content: &str) -> Option<String> {
     ];
 
     for pat in &prompt_patterns {
-        if let Ok(re) = Regex::new(pat) {
-            if let Some(caps) = re.captures(content) {
-                if let Some(prompt) = caps.get(1) {
-                    let text = prompt.as_str().to_string();
-                    // Truncate for storage
-                    if text.len() > 500 {
-                        return Some(format!("{}...", &text[..500]));
-                    }
-                    return Some(text);
-                }
+        if let Ok(re) = Regex::new(pat)
+            && let Some(caps) = re.captures(content)
+            && let Some(prompt) = caps.get(1)
+        {
+            let text = prompt.as_str().to_string();
+            // Truncate for storage
+            if text.len() > 500 {
+                return Some(format!("{}...", &text[..500]));
             }
+            return Some(text);
         }
     }
 
@@ -318,13 +316,13 @@ fn detect_guardrails(content: &str) -> Vec<Guardrail> {
     ];
 
     for (pattern, kind, description) in &checks {
-        if let Ok(re) = Regex::new(&format!("(?i){}", pattern)) {
-            if re.is_match(content) {
-                guardrails.push(Guardrail {
-                    kind: kind.clone(),
-                    description: description.to_string(),
-                });
-            }
+        if let Ok(re) = Regex::new(&format!("(?i){}", pattern))
+            && re.is_match(content)
+        {
+            guardrails.push(Guardrail {
+                kind: kind.clone(),
+                description: description.to_string(),
+            });
         }
     }
 
@@ -345,21 +343,21 @@ fn detect_data_access(content: &str) -> Vec<DataAccess> {
     ];
 
     for (pattern, source) in &patterns {
-        if let Ok(re) = Regex::new(pattern) {
-            if re.is_match(content) {
-                let access_type = if content.contains("write") || content.contains("insert")
-                    || content.contains("update") || content.contains("delete")
-                    || content.contains("put") || content.contains("post")
-                {
-                    "read/write"
-                } else {
-                    "read"
-                };
-                access.push(DataAccess {
-                    source: source.to_string(),
-                    access_type: access_type.to_string(),
-                });
-            }
+        if let Ok(re) = Regex::new(pattern)
+            && re.is_match(content)
+        {
+            let access_type = if content.contains("write") || content.contains("insert")
+                || content.contains("update") || content.contains("delete")
+                || content.contains("put") || content.contains("post")
+            {
+                "read/write"
+            } else {
+                "read"
+            };
+            access.push(DataAccess {
+                source: source.to_string(),
+                access_type: access_type.to_string(),
+            });
         }
     }
 
@@ -377,13 +375,13 @@ fn detect_permissions(content: &str) -> Vec<Permission> {
     ];
 
     for (pattern, scope, level) in &patterns {
-        if let Ok(re) = Regex::new(pattern) {
-            if re.is_match(content) {
-                permissions.push(Permission {
-                    scope: scope.to_string(),
-                    level: level.clone(),
-                });
-            }
+        if let Ok(re) = Regex::new(pattern)
+            && re.is_match(content)
+        {
+            permissions.push(Permission {
+                scope: scope.to_string(),
+                level: level.clone(),
+            });
         }
     }
 
