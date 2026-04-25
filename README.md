@@ -31,9 +31,38 @@ $ agent-shield scan ./my-project
 
 ## Install
 
+### Prebuilt binary (recommended)
+
+Download the latest release archive for your platform from
+[GitHub Releases](https://github.com/cschuman/agent-shield/releases/latest)
+and extract it onto your `PATH`. One-liner per platform:
+
 ```bash
-cargo install agent-shield
+# macOS (Apple Silicon)
+curl -fsSL https://github.com/cschuman/agent-shield/releases/latest/download/agent-shield-aarch64-darwin.tar.gz | tar -xz
+
+# macOS (Intel)
+curl -fsSL https://github.com/cschuman/agent-shield/releases/latest/download/agent-shield-x86_64-darwin.tar.gz | tar -xz
+
+# Linux (x86_64)
+curl -fsSL https://github.com/cschuman/agent-shield/releases/latest/download/agent-shield-x86_64-linux.tar.gz | tar -xz
 ```
+
+Each archive expands into `agent-shield-<version>-<platform>/agent-shield`.
+Move the binary onto your `PATH` (e.g. `/usr/local/bin`) and verify with
+`agent-shield --version`. Each release also publishes `SHA256SUMS` for
+integrity verification.
+
+Windows binaries are not yet shipped. If you need one, please
+[open an issue](https://github.com/cschuman/agent-shield/issues).
+
+### From source
+
+```bash
+cargo install --git https://github.com/cschuman/agent-shield agent-shield
+```
+
+Requires Rust 1.85 or newer (edition 2024).
 
 ## Usage
 
