@@ -1,0 +1,19 @@
+schema_version: "1.0"
+id: "bad/unknown-signal"
+category: missing_guardrail
+severity: medium
+description: "references a context signal not in the v1.0 allowlist"
+title: "Unknown signal demo"
+remediation: "Reference an allowlisted signal."
+when:
+  context_signal:
+    name: data_classification
+    op: eq
+    value: "PII"
+score_adjustment: 5
+compliance:
+  nist_ai_rmf:   ["NIST AI RMF"]
+  iso_42001:     ["ISO/IEC 42001"]
+  eu_ai_act:     ["EU AI Act"]
+  owasp_agentic: ["OWASP Agentic Top 10"]
+extends: null

@@ -1,0 +1,10 @@
+schema_version: "1.0"
+id: "bad/malformed-yaml"
+category: detection
+framework: LangChain
+severity: high
+description: "intentionally malformed — unclosed list to fail serde parse"
+when:
+  any_of:
+    - { import_contains: "langchain"
+extends: null

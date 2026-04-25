@@ -1,0 +1,10 @@
+schema_version: "1.0"
+id: "bad/bad-regex"
+category: detection
+framework: LangChain
+severity: high
+description: "regex with unclosed group — must fail to compile"
+when:
+  any_of:
+    - { code_pattern: "(unclosed" }
+extends: null

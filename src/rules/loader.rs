@@ -761,4 +761,94 @@ when:
         let err = one(yaml).expect_err("must reject");
         assert!(err.message.contains("meaningless"));
     }
+
+    /// Bad-rule fixtures (W2-C9). Each file under `tests/bad-rules/`
+    /// represents a distinct quarantine path. The contract: each fixture
+    /// produces exactly one diagnostic, and the rest of a mixed bundle is
+    /// unaffected.
+    mod bad_rule_fixtures {
+        use super::*;
+
+        const MALFORMED_YAML: &str =
+            include_str!("../../tests/bad-rules/malformed-yaml.yaml");
+        const BAD_REGEX: &str = include_str!("../../tests/bad-rules/bad-regex.yaml");
+        const NON_NULL_EXTENDS: &str =
+            include_str!("../../tests/bad-rules/non-null-extends.yaml");
+        const UNKNOWN_SIGNAL: &str =
+            include_str!("../../tests/bad-rules/unknown-signal.yaml");
+        const FUTURE_SCHEMA_VERSION: &str =
+            include_str!("../../tests/bad-rules/future-schema-version.yaml");
+
+        const GOOD_DETECTION: &str = include_str!("../../rules/builtin/langchain.yaml");
+
+        fn quarantines_one(label: &str, yaml: &str, expected_substr: &str) {
+            let bundle = [(label, yaml)];
+            let parsed = parse_bundle(&bundle);
+            assert_eq!(
+                parsed.detection.len(),
+                0,
+                "{}: detection must stay empty",
+                label
+            );
+            assert_eq!(parsed.scoring.len(), 0, "{}: scoring must stay empty", label);
+            assert_eq!(
+                parsed.diagnostics.len(),
+                1,
+                "{}: must produce exactly one diagnostic, got {:?}",
+                label,
+                parsed.diagnostics
+            );
+            let msg = &parsed.diagnostics[0].message;
+            assert!(
+                msg.contains(expected_substr),
+                "{}: diagnostic should mention `{}`, got `{}`",
+                label,
+                expected_substr,
+                msg
+            );
+        }
+
+        #[test]
+        fn malformed_yaml_quarantined() {
+            quarantines_one("malformed-yaml", MALFORMED_YAML, "YAML parse error");
+        }
+
+        #[test]
+        fn bad_regex_quarantined() {
+            quarantines_one("bad-regex", BAD_REGEX, "regex");
+        }
+
+        #[test]
+        fn non_null_extends_quarantined() {
+            quarantines_one("non-null-extends", NON_NULL_EXTENDS, "extends");
+        }
+
+        #[test]
+        fn unknown_signal_quarantined() {
+            quarantines_one("unknown-signal", UNKNOWN_SIGNAL, "signal");
+        }
+
+        #[test]
+        fn future_schema_version_quarantined() {
+            quarantines_one(
+                "future-schema-version",
+                FUTURE_SCHEMA_VERSION,
+                "schema_version",
+            );
+        }
+
+        /// A bad neighbor must not poison the bundle: when a bad rule is
+        /// loaded alongside a good one, the good one still compiles.
+        #[test]
+        fn bad_rule_does_not_poison_bundle() {
+            let bundle = [
+                ("langchain-good", GOOD_DETECTION),
+                ("bad-regex", BAD_REGEX),
+                ("future-schema-version", FUTURE_SCHEMA_VERSION),
+            ];
+            let parsed = parse_bundle(&bundle);
+            assert_eq!(parsed.detection.len(), 1, "good rule survives");
+            assert_eq!(parsed.diagnostics.len(), 2, "two bad neighbors quarantined");
+        }
+    }
 }

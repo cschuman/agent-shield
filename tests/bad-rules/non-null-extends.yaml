@@ -1,0 +1,10 @@
+schema_version: "1.0"
+id: "bad/non-null-extends"
+category: detection
+framework: LangChain
+severity: high
+description: "extends is reserved for v1.1 — non-null must be rejected"
+when:
+  any_of:
+    - { import_contains: "langchain" }
+extends: "scoring/missing-system-prompt"

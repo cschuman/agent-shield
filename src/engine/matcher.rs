@@ -424,6 +424,7 @@ fn compare_bool(actual: bool, op: SignalOp, expected: &SignalValue) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::signals::{GuardrailFlags, PermissionFlags};
 
     fn signals_with_tools(n: usize) -> ContextSignals {
         ContextSignals {

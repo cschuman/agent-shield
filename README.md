@@ -6,7 +6,7 @@ Discover, score, and audit every AI agent in your codebase. Get a risk report in
 
 ## Status
 
-Pre-1.0. Detection rules are migrating from Rust to YAML data files. Schema is **experimental** and may change without notice. Not currently accepting community rule contributions — see [`docs/rules-design/round3-synthesis.md`](docs/rules-design/round3-synthesis.md) for the design exercise that produced the current direction.
+Pre-1.0. Detection rules now live in [`rules/builtin/`](rules/builtin/) and scoring rules in [`rules/scoring/`](rules/scoring/), bundled into the binary at build time via `include_str!`. Schema is **experimental** (`schema_version: "1.0"`) and may change without notice — overlay support (`extends:`) is reserved for v1.1. Bad rules are quarantined to stderr at engine init and the scan continues; see [`docs/rules-design/round3-synthesis.md`](docs/rules-design/round3-synthesis.md) for the full design.
 
 ```
 $ agent-shield scan ./my-project

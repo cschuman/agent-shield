@@ -1,0 +1,10 @@
+schema_version: "1.1"
+id: "bad/future-schema-version"
+category: detection
+framework: LangChain
+severity: high
+description: "loader must reject anything other than schema_version 1.0"
+when:
+  any_of:
+    - { import_contains: "langchain" }
+extends: null
