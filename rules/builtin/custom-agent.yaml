@@ -7,7 +7,33 @@ framework: CustomAgent
 min_match_count: 2
 extends: null
 when:
+  # Calibration on OpenInterpreter/open-interpreter (a canonical custom
+  # agent project) returned ZERO detections under the original rule. Root
+  # causes:
+  #   1. Open Interpreter uses `system_message` (LiteLLM convention),
+  #      not `system_prompt` / `systemPrompt`.
+  #   2. tool_call regex required assignment form (`tool_call =`); real
+  #      code uses dict-key form (`"tool_call":`) and call-site form.
+  #   3. No detection for the OpenAI message-format `{"role": "system"}`
+  #      pattern that nearly every custom agent uses.
+  #
+  # Fix: broaden the alternatives to catch the LiteLLM/OpenAI/Anthropic
+  # base-SDK dialects. Keep min_match_count: 2 so a single tool_call
+  # mention without an agent loop still doesn't fire.
   any_of:
-    - code_regex: '(?:system_prompt|systemPrompt)\s*[=:]'
-    - code_regex: '(?:tool_call|toolCall|function_call)\s*[=:\(]'
-    - code_regex: 'agent[_.](?:loop|run|execute|step)\s*\('
+    - code_regex: '(?:system_prompt|systemPrompt|system_message|systemMessage)\s*[=:]'
+    - code_regex: '(?:tool_call|toolCall|function_call|functionCall)\s*[=:\(]'
+    - code_regex: '["'']tool_calls?["'']\s*:'
+    - code_regex: '["'']role["'']\s*:\s*["'']system["'']'
+    - code_regex: 'agent[_.](?:loop|run|execute|step|chat)\s*\('
+    - code_regex: '\b(?:litellm|completion)\s*\.\s*completion\s*\('
+    # Anthropic base-SDK detection. The original single regex
+    # `Anthropic().messages.create(` only matched the inline-chained form
+    # and missed the canonical `client = Anthropic(...); client.messages.create(...)`
+    # idiom. Replace with two narrower signals: an explicit `anthropic`
+    # package import (Anthropic-specific) and a `.messages.create(` call
+    # shape. Both contribute to min_match_count: 2, so neither fires the
+    # rule on its own — files need an Anthropic anchor AND a call site (or
+    # one of these plus another agent signal) to qualify.
+    - code_regex: '^\s*(?:from|import)\s+anthropic\b'
+    - code_regex: '\.\s*messages\s*\.\s*create\s*\('

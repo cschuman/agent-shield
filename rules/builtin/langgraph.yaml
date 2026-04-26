@@ -4,11 +4,25 @@ category: detection
 severity: high
 description: "LangGraph agent graph detected"
 framework: LangGraph
+# all_of below is itself the gate.
 min_match_count: 1
 extends: null
 when:
-  any_of:
-    - import_contains: "langgraph"
-    - import_contains: "from langgraph"
-    - package_dep: "langgraph"
-    - package_dep: "@langchain/langgraph"
+  # Calibration on langchain-ai/langgraph showed bare `import langgraph`
+  # produced 385 detections with ~0% precision: every framework-internal
+  # file, every checkpoint backend, every test fixture, and every SDK
+  # client imports langgraph — none of those are agents. The rule needs
+  # a positive agent signal: a graph constructor or an entrypoint.
+  all_of:
+    - any_of:
+        - code_regex: '^\s*(from|import)\s+langgraph'
+        - code_regex: "^\\s*(from|import)\\s+@?langchain[/_]langgraph"
+    - any_of:
+        - code_regex: '\bStateGraph\s*\('
+        - code_regex: '\bMessageGraph\s*\('
+        - code_regex: '\bcreate_react_agent\s*\('
+        - code_regex: '\bcreate_agent\s*\('
+        - code_regex: '\bcreate_supervisor\s*\('
+        - code_regex: '\.add_node\s*\('
+        - code_regex: '@entrypoint\b'
+        - code_regex: '@task\b'

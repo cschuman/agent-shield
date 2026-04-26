@@ -7,8 +7,14 @@ framework: AWSBedrock
 min_match_count: 1
 extends: null
 when:
+  # Calibration on vercel/ai showed `bedrock-agent` substring matching the
+  # service URL `bedrock-agent-runtime.us-west-2.amazonaws.com` inside
+  # `packages/amazon-bedrock/src/bedrock-provider.ts` (a provider config,
+  # not an agent). Replace bare substrings with anchored SDK class names
+  # and the canonical `@aws-sdk/client-bedrock-agent[-runtime]` package.
   any_of:
-    - code_regex: 'bedrock-agent'
-    - code_regex: 'BedrockAgent'
-    - code_regex: 'bedrock_agent'
     - import_contains: "@aws-sdk/client-bedrock-agent"
+    - code_regex: '\bBedrockAgentClient\b'
+    - code_regex: '\bBedrockAgentRuntimeClient\b'
+    - code_regex: '\bbedrock_agent_client\b'
+    - code_regex: '\bbedrock_agent_runtime_client\b'

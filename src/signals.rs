@@ -83,10 +83,15 @@ pub fn compute_all_signals(agent: &DiscoveredAgent) -> ContextSignals {
             .any(|p| matches!(p.level, PermissionLevel::Write)),
     };
 
-    let has_audit_trail = agent.guardrails.iter().any(|g| {
-        let d = g.description.to_lowercase();
-        d.contains("log") || d.contains("audit")
-    });
+    // The previous implementation substring-matched the guardrail
+    // description text for "log"/"audit", which never matched any
+    // canned description string and silently caused the
+    // missing-audit-trail rule to fire on every agent. Match the
+    // structured GuardrailKind directly — the only correct shape.
+    let has_audit_trail = agent
+        .guardrails
+        .iter()
+        .any(|g| g.kind == GuardrailKind::AuditTrail);
 
     ContextSignals {
         tool_count: agent.tools.len(),

@@ -4,11 +4,29 @@ category: detection
 severity: high
 description: "LangChain agent or chain detected"
 framework: LangChain
+# all_of below is itself the gate.
 min_match_count: 1
 extends: null
 when:
-  any_of:
-    - import_contains: "langchain"
-    - import_contains: "from langchain"
-    - package_dep: "langchain"
-    - package_dep: "@langchain/core"
+  # Calibration on langchain-ai/langgraph showed bare `import langchain`
+  # was insufficient to identify an agent. In a langchain monorepo every
+  # file imports the framework — utility modules, type stubs, re-exports,
+  # tests. The rule needs a positive agent signal beyond the import.
+  #
+  # Symmetrically, calibration on crewAIInc/crewAI-examples showed the
+  # rule firing on tasks.py orchestrator files where `from langchain.tools
+  # import Tool` is an aux import, not an agent definition.
+  #
+  # Fix: require an import AND a constructor/factory call. The fixture
+  # `fixtures/langchain-basic/main.py` uses `create_react_agent` and
+  # `AgentExecutor`, both still match.
+  all_of:
+    - any_of:
+        - code_regex: '^\s*(from|import)\s+langchain'
+        - code_regex: "^\\s*(from|import)\\s+@?langchain[/_]"
+    - any_of:
+        - code_regex: '\bAgentExecutor\s*\('
+        - code_regex: '\bcreate_(?:react|openai|tool_calling|json|sql|csv|pandas|xml)_agent\s*\('
+        - code_regex: '\binitialize_agent\s*\('
+        - code_regex: '\bRunnableAgent\s*\('
+        - code_regex: '\bAgentType\.'

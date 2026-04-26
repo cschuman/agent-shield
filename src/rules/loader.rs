@@ -294,6 +294,27 @@ fn is_signal_only(m: &Matcher) -> bool {
     }
 }
 
+/// Recursively check whether a matcher tree contains any repo-level
+/// primitive (`PackageDep` or `FilePresent`). The v0.1 scanner only
+/// invokes `matches_file`/`matches_signals`, both of which return empty
+/// for repo-level matchers — so a rule that depends on them silently
+/// never fires. Reject at parse time to surface the gap loudly until
+/// the manifest pass lands and `matches_repo` becomes the third
+/// evaluation context.
+fn contains_repo_matcher(m: &Matcher) -> bool {
+    match m {
+        Matcher::PackageDep { .. } | Matcher::FilePresent { .. } => true,
+        Matcher::AllOf(children) | Matcher::AnyOf(children) => {
+            children.iter().any(contains_repo_matcher)
+        }
+        Matcher::Not(inner) => contains_repo_matcher(inner),
+        Matcher::ContextSignal { .. }
+        | Matcher::ImportContains { .. }
+        | Matcher::CodeRegex { .. }
+        | Matcher::MultilineRegex { .. } => false,
+    }
+}
+
 fn translate_detection(source: &str, parsed: ParsedRule) -> Result<CompiledRule, RuleDiagnostic> {
     let id = parsed.id.clone();
 
@@ -324,6 +345,13 @@ fn translate_detection(source: &str, parsed: ParsedRule) -> Result<CompiledRule,
         )
     })?;
     let matcher = translate_matcher(source, &id, &parsed.when)?;
+    if contains_repo_matcher(&matcher) {
+        return Err(RuleDiagnostic::new(
+            source,
+            Some(&id),
+            "detection rule contains a repo-level matcher (`package_dep` or `file_present`); these are dormant in v0.1 — the scanner only invokes `matches_file`. They will fire once the manifest pass lands. Until then, rely on `import_contains` / `code_regex` and remove the dormant alternatives",
+        ));
+    }
     Ok(CompiledRule {
         id,
         framework,
@@ -337,8 +365,9 @@ fn translate_detection(source: &str, parsed: ParsedRule) -> Result<CompiledRule,
 /// variant identifier (`LangChain`, not the human-readable display name).
 fn resolve_framework(name: &str) -> Option<AgentFramework> {
     AgentFramework::all()
-        .into_iter()
+        .iter()
         .find(|fw| variant_ident(fw) == name)
+        .copied()
 }
 
 fn variant_ident(fw: &AgentFramework) -> &'static str {
@@ -586,7 +615,7 @@ framework: LangChain
 when:
   any_of:
     - import_contains: "langchain"
-    - package_dep: "langchain"
+    - code_regex: '\bAgentExecutor\s*\('
 "#;
         let rule = one_detection(yaml).expect("must parse");
         assert_eq!(rule.id, "x");
@@ -882,6 +911,51 @@ when:
         assert_eq!(parsed.diagnostics.len(), 1, "bad rule quarantined");
         assert_eq!(parsed.detection[0].id, "good");
         assert_eq!(parsed.diagnostics[0].rule_id.as_deref(), Some("bad"));
+    }
+
+    #[test]
+    fn detection_rule_with_repo_matcher_is_quarantined() {
+        // package_dep / file_present primitives are dormant in v0.1
+        // (the scanner only invokes matches_file). A rule that depends
+        // on them silently never fires, so the loader must reject them
+        // at parse time. This guards against the autogen.yaml /
+        // anthropic-mcp.yaml class of bug where a rule loads cleanly
+        // but produces zero detections forever.
+        let yaml = r#"
+schema_version: "1.0"
+id: "framework/dormant/agent-detected"
+category: detection
+severity: high
+description: "uses dormant repo-level matcher"
+framework: AutoGen
+when:
+  any_of:
+    - import_contains: "autogen"
+    - package_dep: "pyautogen"
+"#;
+        let err = one(yaml).expect_err("repo-matcher rule must quarantine");
+        assert!(
+            err.message.contains("repo-level matcher"),
+            "expected repo-level diagnostic, got: {}",
+            err.message
+        );
+    }
+
+    #[test]
+    fn detection_rule_with_only_file_matchers_is_accepted() {
+        let yaml = r#"
+schema_version: "1.0"
+id: "framework/file-only/agent-detected"
+category: detection
+severity: high
+description: "uses only file-level matchers"
+framework: AutoGen
+when:
+  any_of:
+    - import_contains: "autogen"
+    - import_contains: "from autogen"
+"#;
+        one_detection(yaml).expect("file-only rule must compile");
     }
 
     #[test]

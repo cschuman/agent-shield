@@ -27,7 +27,7 @@ impl std::fmt::Display for Framework {
 #[derive(Debug, Clone, Serialize)]
 pub struct ScoredAgent {
     pub name: String,
-    pub framework: String,
+    pub framework: AgentFramework,
     pub file_path: String,
     pub line_number: usize,
     pub risk_score: u8,
@@ -180,7 +180,7 @@ fn score_single_agent(
 
     ScoredAgent {
         name: agent.name.clone(),
-        framework: agent.framework.clone(),
+        framework: agent.framework,
         file_path: agent.file_path.display().to_string(),
         line_number: agent.line_number,
         risk_score: final_score,
@@ -278,13 +278,8 @@ fn pick_compliance(c: &Compliance, fw: &Framework) -> String {
     })
 }
 
-fn get_framework_baseline(framework_name: &str) -> i16 {
-    for fw in AgentFramework::all() {
-        if fw.name() == framework_name {
-            return fw.risk_baseline() as i16;
-        }
-    }
-    50 // unknown framework
+fn get_framework_baseline(framework: &AgentFramework) -> i16 {
+    framework.risk_baseline() as i16
 }
 
 #[cfg(test)]
@@ -298,7 +293,7 @@ mod tests {
     fn naked_agent() -> DiscoveredAgent {
         DiscoveredAgent {
             name: "test-agent".into(),
-            framework: "LangChain".into(),
+            framework: AgentFramework::LangChain,
             file_path: PathBuf::from("test.py"),
             line_number: 1,
             tools: Vec::new(),

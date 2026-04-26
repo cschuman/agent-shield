@@ -4,13 +4,32 @@ category: detection
 severity: high
 description: "Vercel AI SDK agent or tool usage detected"
 framework: VercelAI
+# all_of is the structural gate; min_match_count: 2 is the floor (still
+# guards against single-line files that happen to satisfy both branches
+# in one regex hit each — a defensive holdover from the original rule).
 min_match_count: 2
 extends: null
 when:
-  any_of:
-    - import_contains: "ai/"
-    - import_contains: "from 'ai'"
-    - import_contains: "from \"ai\""
-    - code_regex: '\bgenerateText\s*\('
-    - code_regex: '\bstreamText\s*\('
-    - code_regex: '\btool\s*\(\s*\{'
+  # Calibration on vercel/ai showed 1,291 detections — every one was a
+  # framework example, test, codemod fixture, or framework-self-import.
+  # Two structural failures drove the noise:
+  #
+  # 1. `import_contains: "ai/"` matched every cross-package import inside
+  #    the monorepo (`@ai-sdk/openai`, `@ai-sdk/provider-utils`, etc.).
+  # 2. Function-call regexes (`generateText(`, `tool({`) ran without an
+  #    import gate — codemod testfixtures, vitest helpers, and even the
+  #    framework's own implementation files all matched.
+  #
+  # Fix: require an import from the canonical `'ai'` package AND at least
+  # one Vercel AI function-call pattern in the same file. The package
+  # namespace `@ai-sdk/...` is intentionally NOT a positive signal — those
+  # imports are common in the monorepo's own implementation files but rare
+  # in downstream user code.
+  all_of:
+    - any_of:
+        - code_regex: "from\\s+['\"]ai['\"]"
+        - code_regex: "require\\(\\s*['\"]ai['\"]\\s*\\)"
+    - any_of:
+        - code_regex: '\bgenerateText\s*\('
+        - code_regex: '\bstreamText\s*\('
+        - code_regex: '\btool\s*\(\s*\{'

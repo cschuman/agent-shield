@@ -74,7 +74,12 @@ fn main() {
                         .filter(|a| a.risk_score >= min_risk)
                         .collect();
 
-                    report::render(&filtered, &framework, &format, output.as_deref());
+                    if let Err(e) =
+                        report::render(&filtered, &framework, &format, output.as_deref())
+                    {
+                        eprintln!("Error writing report: {e}");
+                        std::process::exit(1);
+                    }
                 }
                 Err(e) => {
                     eprintln!("Error scanning {}: {}", path.display(), e);
