@@ -337,8 +337,9 @@ fn translate_detection(source: &str, parsed: ParsedRule) -> Result<CompiledRule,
 /// variant identifier (`LangChain`, not the human-readable display name).
 fn resolve_framework(name: &str) -> Option<AgentFramework> {
     AgentFramework::all()
-        .into_iter()
+        .iter()
         .find(|fw| variant_ident(fw) == name)
+        .copied()
 }
 
 fn variant_ident(fw: &AgentFramework) -> &'static str {

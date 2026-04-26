@@ -9,7 +9,7 @@ use comfy_table::{ContentArrangement, Table};
 /// retains identity, display name, and risk baseline; the legacy
 /// `detection_patterns()` accessor and `DetectionPattern` enum were removed
 /// alongside `scanner.rs`'s switch to the `Engine`.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AgentFramework {
     LangChain,
     LangGraph,
@@ -53,25 +53,40 @@ impl AgentFramework {
         }
     }
 
-    pub fn all() -> Vec<Self> {
-        vec![
-            Self::LangChain,
-            Self::LangGraph,
-            Self::CrewAI,
-            Self::AutoGen,
-            Self::OpenAIAssistants,
-            Self::AnthropicMCP,
-            Self::AnthropicAgentSDK,
-            Self::AWSBedrock,
-            Self::VercelAI,
-            Self::CustomAgent,
-        ]
+    pub fn all() -> &'static [Self] {
+        const ALL: &[AgentFramework] = &[
+            AgentFramework::LangChain,
+            AgentFramework::LangGraph,
+            AgentFramework::CrewAI,
+            AgentFramework::AutoGen,
+            AgentFramework::OpenAIAssistants,
+            AgentFramework::AnthropicMCP,
+            AgentFramework::AnthropicAgentSDK,
+            AgentFramework::AWSBedrock,
+            AgentFramework::VercelAI,
+            AgentFramework::CustomAgent,
+        ];
+        ALL
     }
 }
 
 impl std::fmt::Display for AgentFramework {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.name())
+    }
+}
+
+// Custom Serialize impl that emits the human-readable display name
+// (e.g. "Anthropic MCP") rather than the variant identifier
+// (`AnthropicMCP`). The default derive would diverge from the JSON
+// contract pinned by the snapshot fixtures, so this impl preserves
+// byte-identical output across the closed-enum migration.
+impl serde::Serialize for AgentFramework {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.name())
     }
 }
 

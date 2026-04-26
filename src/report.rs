@@ -107,7 +107,7 @@ fn render_terminal(agents: &[ScoredAgent], framework: &Framework) {
 
         table.add_row(vec![
             Cell::new(&agent.name),
-            Cell::new(&agent.framework),
+            Cell::new(agent.framework.to_string()),
             Cell::new(format!("{}/100 {}", agent.risk_score, agent.risk_level)).fg(risk_color),
             Cell::new(agent.tool_count.to_string()),
             Cell::new(agent.guardrail_count.to_string()),

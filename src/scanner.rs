@@ -196,7 +196,7 @@ static PERMISSION_PATTERNS: LazyLock<Vec<(Regex, &'static str, PermissionLevel)>
 #[derive(Debug, Clone, Serialize)]
 pub struct DiscoveredAgent {
     pub name: String,
-    pub framework: String,
+    pub framework: AgentFramework,
     pub file_path: PathBuf,
     pub line_number: usize,
     pub tools: Vec<ToolDefinition>,
@@ -286,7 +286,13 @@ const SCAN_EXTENSIONS: &[&str] = &[
     "py", "js", "ts", "tsx", "jsx", "rs", "go", "java", "yaml", "yml", "json", "toml",
 ];
 
-pub fn scan_directory(path: &Path) -> Result<Vec<DiscoveredAgent>, Box<dyn std::error::Error>> {
+#[derive(Debug, thiserror::Error)]
+pub enum ScanError {
+    #[error("failed to walk directory: {0}")]
+    Walk(#[from] walkdir::Error),
+}
+
+pub fn scan_directory(path: &Path) -> Result<Vec<DiscoveredAgent>, ScanError> {
     let mut agents = Vec::new();
     let mut seen_files: HashSet<PathBuf> = HashSet::new();
     // Dedupe by (file_path, framework_name) at push time. The previous
@@ -411,7 +417,7 @@ fn extract_agent_details(
 
     DiscoveredAgent {
         name,
-        framework: framework.name().to_string(),
+        framework: *framework,
         file_path: file_path.to_path_buf(),
         line_number: first_match,
         tools,
