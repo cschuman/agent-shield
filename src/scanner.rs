@@ -100,6 +100,16 @@ static GUARDRAIL_CHECKS: LazyLock<Vec<(Regex, GuardrailKind, &'static str)>> = L
             GuardrailKind::ScopeRestriction,
             "Scope restriction detected",
         ),
+        // Audit-trail detection — looks for explicit logging or audit
+        // hooks. Required by NIST AI RMF MEASURE-2.7 and OWASP A06.
+        // Patterns intentionally narrow: structured logger imports,
+        // standard logging packages, and explicit audit-event APIs.
+        // Plain `print()` calls do NOT qualify as an audit trail.
+        (
+            r"\b(?:logger|logging|log4j|slf4j|winston|bunyan|pino|tracing|opentelemetry)\b\s*[\.\(:]|@(?:audit_log|audit)\b|audit_log\s*\(|log_event\s*\(|emit_audit\s*\(",
+            GuardrailKind::AuditTrail,
+            "Audit logging detected",
+        ),
     ];
     raw.iter()
         .map(|(p, kind, desc)| {
@@ -227,7 +237,7 @@ pub struct Guardrail {
     pub description: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum GuardrailKind {
     InputValidation,
     OutputFiltering,
@@ -237,6 +247,7 @@ pub enum GuardrailKind {
     TokenLimit,
     TimeoutLimit,
     ScopeRestriction,
+    AuditTrail,
 }
 
 #[derive(Debug, Clone, Serialize)]
