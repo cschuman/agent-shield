@@ -24,7 +24,7 @@ pub enum AgentFramework {
 }
 
 impl AgentFramework {
-    pub fn name(&self) -> &str {
+    pub fn name(&self) -> &'static str {
         match self {
             Self::LangChain => "LangChain",
             Self::LangGraph => "LangGraph",

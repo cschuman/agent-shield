@@ -4,6 +4,18 @@ use colored::Colorize;
 use comfy_table::{Cell, Color as TableColor, ContentArrangement, Table};
 use std::path::Path;
 
+#[derive(Debug, thiserror::Error)]
+pub enum RenderError {
+    #[error("failed to serialize report to JSON: {0}")]
+    Serialize(#[from] serde_json::Error),
+    #[error("failed to write report to {path}: {source}")]
+    Write {
+        path: std::path::PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+}
+
 #[derive(Debug, Clone, clap::ValueEnum)]
 pub enum OutputFormat {
     Terminal,
@@ -15,9 +27,12 @@ pub fn render(
     framework: &Framework,
     format: &OutputFormat,
     output_path: Option<&Path>,
-) {
+) -> Result<(), RenderError> {
     match format {
-        OutputFormat::Terminal => render_terminal(agents, framework),
+        OutputFormat::Terminal => {
+            render_terminal(agents, framework);
+            Ok(())
+        }
         OutputFormat::Json => render_json(agents, output_path),
     }
 }
@@ -229,7 +244,7 @@ fn render_terminal(agents: &[ScoredAgent], framework: &Framework) {
     println!();
 }
 
-fn render_json(agents: &[ScoredAgent], output_path: Option<&Path>) {
+fn render_json(agents: &[ScoredAgent], output_path: Option<&Path>) -> Result<(), RenderError> {
     let report = serde_json::json!({
         "agent_shield_version": env!("CARGO_PKG_VERSION"),
         "scan_date": Utc::now().to_rfc3339(),
@@ -238,14 +253,18 @@ fn render_json(agents: &[ScoredAgent], output_path: Option<&Path>) {
         "agents": agents,
     });
 
-    let json = serde_json::to_string_pretty(&report).unwrap();
+    let json = serde_json::to_string_pretty(&report)?;
 
     if let Some(path) = output_path {
-        std::fs::write(path, &json).unwrap();
+        std::fs::write(path, &json).map_err(|source| RenderError::Write {
+            path: path.to_path_buf(),
+            source,
+        })?;
         println!("Report written to {}", path.display());
     } else {
         println!("{}", json);
     }
+    Ok(())
 }
 
 fn calculate_overall_score(agents: &[ScoredAgent]) -> u8 {
