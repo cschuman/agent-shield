@@ -7,7 +7,9 @@ framework: AnthropicAgentSDK
 min_match_count: 1
 extends: null
 when:
+  # NOTE: `package_dep:` alternative for claude-agent-sdk was removed
+  # because the v0.1 scanner only invokes `matches_file`, so repo-level
+  # matchers contributed zero hits. Restore when the manifest pass lands.
   any_of:
     - import_contains: "claude_agent_sdk"
     - import_contains: "@anthropic-ai/agent-sdk"
-    - package_dep: "claude-agent-sdk"

@@ -13,11 +13,13 @@ when:
   # `mcpd`, `tmcp`, and any line where the word `import` appeared near
   # any token containing `mcp`. Replaced with anchored variants requiring
   # the actual MCP package or namespace.
+  # NOTE: `file_present:` alternatives for mcp.json / .mcp.json were
+  # removed because the v0.1 scanner only invokes `matches_file`, so
+  # repo-level matchers contributed zero hits in practice. Restore them
+  # when the manifest pass lands (v1.1).
   any_of:
     - import_contains: "@modelcontextprotocol"
     - code_regex: '^\s*from\s+mcp(\.|\s+import\b)'
     - code_regex: '^\s*import\s+mcp(\.|\s|$)'
-    - file_present: "mcp.json"
-    - file_present: ".mcp.json"
     - code_regex: '\bMcpServer\s*\('
     - code_regex: '\bmcp_server\s*\('
